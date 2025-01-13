@@ -423,6 +423,7 @@ components:
             vectorCount: 50000
           example-namespace-2:
             vectorCount: 30000
+        totalVectorCount: 80000
       description: The response for the `describe_index_stats` operation.
       type: object
       properties:

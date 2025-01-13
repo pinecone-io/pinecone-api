@@ -412,6 +412,7 @@ components:
             vectorCount: 30000
         dimension: 1024
         index_fullness: 0.4
+        totalVectorCount: 80000
       properties:
         namespaces:
           type: object
