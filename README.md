@@ -17,18 +17,16 @@ These files represent the Pinecone API services at specific points in time and a
 
 ## Overview
 
-The [Pinecone APIs](https://docs.pinecone.io/reference/api/introduction) allow you to interact programmatically with your Pinecone account. There are several core services which allow you to work with
-databases (indexes and vectors), inference, and assistant.
+[Pinecone APIs](https://docs.pinecone.io/reference/api/introduction) provide a way to interact programmatically with your Pinecone account. There are several core services that work with databases (indexes and vectors), inference, and assistant.
 
-- **Database**: The [database API](https://docs.pinecone.io/reference/api/introduction#database-api) allows managing index resources, and the records stored within these indexes. The database APIs include
+- **Database**: The [Database API](https://docs.pinecone.io/reference/api/introduction#database-api) can be used to manage index resources, and the records stored within these indexes. The database services include
   both REST and gRPC specifications. The relevant filenames will include "data", "control", "db_data", or "db_control" depending on the version.
-- **Inference**: The [inference API](https://docs.pinecone.io/guides/inference/understanding-inference) gives you access to embedding and reranking models hosted on Pinecone's infrastructure. The inference
-  service supports REST.
-- **Assistant**: The [assistant API](https://docs.pinecone.io/guides/get-started/assistant-quickstart) is a service that allows you to upload documents, ask questions, and receive responses
-  that reference your documents.
+- **Inference**: The [Inference API](https://docs.pinecone.io/guides/inference/understanding-inference) provides access to embedding and reranking models hosted on Pinecone's infrastructure. The inference
+  services support REST.
+- **Assistant**: The [Assistant API](https://docs.pinecone.io/guides/get-started/assistant-quickstart) facillitates uploading documents, asking questions, and receiving responses that reference your documents. The assistant services support REST.
 
 Support for these services is dependent on which version of the Pinecone API you are working with. For example, inference is only available in version `2024-10` and later.
-Read more about [Pinecone API versioning](https://docs.pinecone.io/reference/api/versioning#get-updates).
+Read more about [Pinecone API versioning](https://docs.pinecone.io/reference/api/versioning).
 
 ---
 
@@ -41,6 +39,8 @@ OpenAPI is a standardized format for describing RESTful APIs. It provides:
 - A human and machine-readable schema of endpoints, request/response payloads, and error codes.
 - Tools for generating API documentation, client SDKs, and server stubs.
 
+[OpenAPI Specification Documentation](https://swagger.io/specification/)
+
 ### Protobuf
 
 Protocol Buffers (Protobuf) are Google's language-neutral, platform-neutral, extensible mechanism for serializing structured data. Protobuf files:
@@ -48,7 +48,7 @@ Protocol Buffers (Protobuf) are Google's language-neutral, platform-neutral, ext
 - Define message structures and service contracts.
 - Enable strongly-typed, high-performance communication between clients and servers.
 
-For more details, see [OpenAPI Specification Documentation](https://swagger.io/specification/) and [Protocol Buffers Documentation](https://protobuf.dev/).
+[Protocol Buffers Documentation](https://protobuf.dev/)
 
 ---
 
@@ -76,26 +76,28 @@ Refer to the tool documentation for usage instructions tailored to your preferre
 ## Versioned Specifications
 
 Each subdirectory in this repository represents a specific version of the Pinecone API. New versions of the Pinecone API are released quarterly.
-You can find more about API versioning [here](https://docs.pinecone.io/reference/api/versioning#get-updates). Directories are named using the `YYYY-MM` format, corresponding to the year and month of the release.
+You can find more about API versioning [here](https://docs.pinecone.io/reference/api/versioning). Directories are named using the `YYYY-MM` format, corresponding to the year and month of the release.
 
 Example:
 
 ```
-2024-04/
+2024-10/
   - db_control_2024-10.oas.yaml
   - db_data_2024-10.oas.yaml
   - db_data_2024-10.proto
   - inference_2024-10.oas.yaml
 ```
 
-- **OpenAPI Files**: Files with the extension: `*.oas.yaml`.
-- **Protobuf Definitions**: Files with the extension: `*.proto`.
+- **OpenAPI Files**: Files with the extension `*.oas.yaml`.
+- **Protobuf Definitions**: Files with the extension `*.proto`.
 
 ---
 
 ## Service-Specific Breakdown
 
-The Pinecone API consists of multiple services. Below is a high-level breakdown of the services and the associated specification files:
+The Pinecone API consists of multiple services. Below is a high-level breakdown of the services and the associated specification files.
+
+Note: The database service is split into "control" and "data" specifications. Control handles managing database resources such as indexes and collections and uses REST. Data defines interaction with a specific index resource and uses gRPC or REST.
 
 | Service                | OpenAPI File                                  | Protobuf File                 | Documentation Link                                                                           |
 | ---------------------- | --------------------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------- |
