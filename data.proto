@@ -72,7 +72,7 @@ message UpsertRequest {
     (google.api.field_behavior) = REQUIRED
   ];
 
-  // The namespace nwhere you upsert vectors.
+  // The namespace where you upsert vectors.
   string          namespace = 2;
 }
 
@@ -206,7 +206,7 @@ message QueryRequest {
   ];
 
 
-  // The query vector. This should be the same length as the dimension of the index being queried. Each `query()` request can contain only one of the parameters `id` or `vector`.
+  // The query vector. This should be the same length as the dimension of the index being queried. Each request can contain either the `id` or `vector` parameter.
   repeated float         vector    = 7;
 
   // The query sparse values.
@@ -298,7 +298,7 @@ message DescribeIndexStatsResponse {
   //
   // Serverless indexes scale automatically as needed, so index fullness is relevant only for pod-based indexes.
   //
-  // The index fullness result may be inaccurate during pod resizing; to get the status of a pod resizing process, use [`describe_index`](https://docs.pinecone.io/reference/api/2024-04/control-plane/describe_index).
+  // The index fullness result may be inaccurate during pod resizing; to get the status of a pod resizing process, use [`describe_index`](https://docs.pinecone.io/reference/api/2024-07/control-plane/describe_index).
   float index_fullness = 3;
 
   // The total number of vectors in the index, regardless of whether a metadata filter expression was passed

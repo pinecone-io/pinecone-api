@@ -1,10 +1,7 @@
 openapi: 3.0.3
 info:
   title: Pinecone Control Plane API
-  description: >-
-    Pinecone is a vector database that makes it easy to search and retrieve
-    billions of high-dimensional vectors.
-  version: '2024-04'
+  description: Pinecone is a vector database that makes it easy to search and retrieve billions of high-dimensional vectors.
   contact:
     name: Pinecone Support
     url: https://support.pinecone.io
@@ -12,96 +9,110 @@ info:
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0
-tags:
-  - name: Manage Indexes
-    description: Actions that manage indexes
+  version: 2024-07
 servers:
-  - url: 'https://api.pinecone.io'
-    description: Production API endpoints
-externalDocs:
-  description: More Pinecone.io API docs
-  url: 'https://docs.pinecone.io/introduction'
+- url: https://api.pinecone.io
+  description: Production API endpoints
 paths:
   /indexes:
     get:
-      operationId: list_indexes
-      summary: 'List indexes'
+      tags:
+      - Manage Indexes
+      summary: List indexes
       description: This operation returns a list of all indexes in a project.
+      operationId: list_indexes
       responses:
         '200':
-          description: >-
-            This operation returns a list of all the indexes that you have
-            previously created, and which are associated with the given project
+          description: This operation returns a list of all the indexes that you have previously created, and which are associated with the given project
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/IndexList'
               examples:
                 multiple-indexes:
-                  summary: 'A list containing one serverless index and one pod-based index.'
+                  summary: A list containing one serverless index and one pod-based index.
                   value:
                     indexes:
-                      - name: 'semantic-search'
-                        dimension: 384
-                        metric: 'cosine'
-                        host: 'semantic-search-c01b5b5.svc.us-west1-gcp.pinecone.io'
-                        status:
-                          ready: true
-                          state: 'Ready'
-                        spec:
-                          pod:
-                            environment: 'us-west1-gcp'
-                            replicas: 2
-                            shards: 2
-                            pod_type: 'p1.x1'
-                            pods: 4
-                      - name: 'image-search'
-                        dimension: 200
-                        metric: 'dotproduct'
-                        host: 'image-search-a31f9c1.svc.us-east1-gcp.pinecone.io'
-                        status:
-                          ready: false
-                          state: 'Initializing'
-                        spec:
-                          serverless:
-                            cloud: 'aws'
-                            region: 'us-east-1'
+                    - dimension: 384
+                      host: semantic-search-c01b5b5.svc.us-west1-gcp.pinecone.io
+                      metric: cosine
+                      name: semantic-search
+                      spec:
+                        pod:
+                          environment: us-west1-gcp
+                          pod_type: p1.x1
+                          pods: 4
+                          replicas: 2
+                          shards: 2
+                      status:
+                        ready: true
+                        state: Ready
+                    - dimension: 200
+                      host: image-search-a31f9c1.svc.us-east1-gcp.pinecone.io
+                      metric: dotproduct
+                      name: image-search
+                      spec:
+                        serverless:
+                          cloud: aws
+                          region: us-east-1
+                      status:
+                        ready: false
+                        state: Initializing
                 one-index:
-                  summary: 'A list containing one serverless index.'
+                  summary: A list containing one serverless index.
                   value:
                     indexes:
-                      - name: 'movie-embeddings'
-                        dimension: 1536
-                        metric: 'cosine'
-                        host: 'movie-embeddings-c01b5b5.svc.us-east1-gcp.pinecone.io'
-                        status:
-                          ready: false
-                          state: 'Initializing'
-                        spec:
-                          serverless:
-                            cloud: 'aws'
-                            region: 'us-east-1'
+                    - dimension: 1536
+                      host: movie-embeddings-c01b5b5.svc.us-east1-gcp.pinecone.io
+                      metric: cosine
+                      name: movie-embeddings
+                      spec:
+                        serverless:
+                          cloud: aws
+                          region: us-east-1
+                      status:
+                        ready: false
+                        state: Initializing
                 no-indexes:
-                  summary: 'No indexes created yet.'
+                  summary: No indexes created yet.
                   value:
                     indexes: []
         '401':
-          $ref: '#/components/responses/401Unauthorized'
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
         '500':
-          $ref: '#/components/responses/500InternalServerError'
-      tags:
-        - Manage Indexes
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
     post:
+      tags:
+      - Manage Indexes
+      summary: Create an index
+      description: "Create an index for vectors created with an external embedding model.\n  \nFor guidance and examples, see [Create an index](https://docs.pinecone.io/guides/indexes/create-an-index#external-embedding).\n"
       operationId: create_index
-      summary: 'Create an index'
-      description: >
-        Create an index for vectors created with an external embedding model.
-
-
-        For guidance and examples, see [Create an index](https://docs.pinecone.io/guides/indexes/create-an-index#external-embedding).
       requestBody:
         description: The desired configuration for the index.
-        required: true
         content:
           application/json:
             schema:
@@ -110,32 +121,35 @@ paths:
               serverless-index:
                 summary: Creating a serverless index
                 value:
-                  name: 'movie-recommendations'
+                  deletion_protection: enabled
                   dimension: 1536
-                  metric: 'cosine'
+                  metric: cosine
+                  name: movie-recommendations
                   spec:
                     serverless:
-                      cloud: 'gcp'
-                      region: 'us-east1'
+                      cloud: gcp
+                      region: us-east1
               pod-index:
                 summary: Creating a pod-based index
                 value:
-                  name: 'movie-recommendations'
+                  deletion_protection: enabled
                   dimension: 1536
-                  metric: 'cosine'
+                  metric: cosine
+                  name: movie-recommendations
                   spec:
                     pod:
-                      environment: 'us-east-1-aws'
-                      replicas: 1
-                      shards: 1
-                      pod_type: 'p1.x1'
-                      pods: 1
+                      environment: us-east-1-aws
                       metadata_config:
                         indexed:
-                          - 'genre'
-                          - 'title'
-                          - 'imdb_rating'
-                      source_collection: 'movie-embeddings'
+                        - genre
+                        - title
+                        - imdb_rating
+                      pod_type: p1.x1
+                      pods: 1
+                      replicas: 1
+                      shards: 1
+                      source_collection: movie-embeddings
+        required: true
       responses:
         '201':
           description: The index has been successfully created.
@@ -144,16 +158,75 @@ paths:
               schema:
                 $ref: '#/components/schemas/IndexModel'
         '400':
-          $ref: '#/components/responses/400BadRequest'
+          description: Bad request. The request body included invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                index-metric-validation-error:
+                  summary: Validation error on metric.
+                  value:
+                    error:
+                      code: INVALID_ARGUMENT
+                      message: Metric must be cosine, euclidean, or dotproduct.
+                    status: 400
         '401':
-          $ref: '#/components/responses/401Unauthorized'
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
         '403':
-          $ref: '#/components/responses/403PodQuotaExceeded'
+          description: You've exceed your pod quota.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Forbidden
+                  value:
+                    error:
+                      code: FORBIDDEN
+                      message: Increase your quota or upgrade to create more indexes.
+                    status: 403
         '404':
-          $ref: '#/components/responses/404ServerlessSpecNotFound'
+          description: Unknown cloud or region when creating a serverless index.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                serverless-spec-cloud-not-found:
+                  summary: Cannot create serverless index with invalid spec.
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: 'Resource cloud: aws region: us-west1 not found.'
+                    status: 404
         '422':
-          $ref: '#/components/responses/422UnprocessableEntity'
-
+          description: Unprocessable entity. The request body could not be deserialized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missing-field:
+                  summary: Unprocessable entity
+                  value:
+                    error:
+                      code: UNPROCESSABLE_ENTITY
+                      message: 'Failed to deserialize the JSON body into the target type: missing field `metric` at line 1 column 16'
+                    status: 422
         '409':
           description: Index of given name already exists.
           content:
@@ -162,32 +235,42 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               examples:
                 index-name-already-exists:
-                  summary: 'Index name needs to be unique.'
+                  summary: Index name needs to be unique.
                   value:
-                    status: 409
                     error:
-                      code: 'ALREADY_EXISTS'
-                      message: 'Resource already exists.'
-
+                      code: ALREADY_EXISTS
+                      message: Resource already exists.
+                    status: 409
         '500':
-          $ref: '#/components/responses/500InternalServerError'
-      tags:
-        - Manage Indexes
-    servers:
-      - url: 'https://api.pinecone.io'
-  '/indexes/{index_name}':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+  /indexes/{index_name}:
     get:
-      operationId: describe_index
-      summary: 'Describe an index'
+      tags:
+      - Manage Indexes
+      summary: Describe an index
       description: Get a description of an index.
+      operationId: describe_index
       parameters:
-        - name: index_name
-          required: true
-          in: path
-          description: The name of the index to be described.
-          example: 'test-index'
-          schema:
-            type: string
+      - in: path
+        name: index_name
+        description: The name of the index to be described.
+        required: true
+        schema:
+          type: string
+        example: test-index
+        style: simple
       responses:
         '200':
           description: Configuration information and deployment status of the index.
@@ -199,39 +282,39 @@ paths:
                 movie-recommendations-serverless:
                   summary: A serverless index
                   value:
-                    name: 'movie-recommendations'
                     dimension: 1536
-                    metric: 'cosine'
-                    host: 'movie-recommendations-c01b5b5.svc.us-east1-gcp.pinecone.io'
-                    status:
-                      ready: false
-                      state: 'Initializing'
+                    host: movie-recommendations-c01b5b5.svc.us-east1-gcp.pinecone.io
+                    metric: cosine
+                    name: movie-recommendations
                     spec:
                       serverless:
-                        cloud: 'aws'
-                        region: 'us-east-1'
+                        cloud: aws
+                        region: us-east-1
+                    status:
+                      ready: false
+                      state: Initializing
                 movie-recommendations-pod:
                   summary: A pod-based index
                   value:
-                    name: 'movie-recommendations'
                     dimension: 1536
-                    metric: 'cosine'
-                    host: 'movie-recommendations-c01b5b5.svc.us-east1-gcp.pinecone.io'
-                    status:
-                      ready: false
-                      state: 'Initializing'
+                    host: movie-recommendations-c01b5b5.svc.us-east1-gcp.pinecone.io
+                    metric: cosine
+                    name: movie-recommendations
                     spec:
                       pod:
-                        environment: 'us-east-1-aws'
-                        replicas: 1
-                        shards: 1
-                        pod_type: 'p1.x1'
-                        pods: 1
+                        environment: us-east-1-aws
                         metadata_config:
                           indexed:
-                            - 'genre'
-                            - 'title'
-                            - 'imdb_rating'
+                          - genre
+                          - title
+                          - imdb_rating
+                        pod_type: p1.x1
+                        pods: 1
+                        replicas: 1
+                        shards: 1
+                    status:
+                      ready: false
+                      state: Initializing
           links:
             UpsertVector:
               operationId: upsert
@@ -258,57 +341,160 @@ paths:
               server:
                 url: $response.body#/host
         '401':
-          $ref: '#/components/responses/401Unauthorized'
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
         '404':
-          $ref: '#/components/responses/404IndexNotFound'
+          description: Index not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                index-not-found:
+                  summary: Index not found
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Index example-index not found.
+                    status: 404
         '500':
-          $ref: '#/components/responses/500InternalServerError'
-      tags:
-        - Manage Indexes
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
     delete:
+      tags:
+      - Manage Indexes
+      summary: Delete an index
+      description: Delete an existing index.
       operationId: delete_index
-      summary: 'Delete an index'
-      description: This operation deletes an existing index.
       parameters:
-        - name: index_name
-          required: true
-          in: path
-          schema:
-            type: string
-          example: 'test-index'
-          description: The name of the index to delete.
+      - in: path
+        name: index_name
+        description: The name of the index to delete.
+        required: true
+        schema:
+          type: string
+        example: test-index
+        style: simple
       responses:
         '202':
           description: The request to delete the index has been accepted.
         '401':
-          $ref: '#/components/responses/401Unauthorized'
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '403':
+          description: 'Forbidden. Deletion protection enabled.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                deletion-protection:
+                  summary: Deletion protection enabled
+                  value:
+                    error:
+                      code: FORBIDDEN
+                      message: 'Deletion protection is enabled for this index. Disable deletion protection before retrying.'
+                    status: 403
         '404':
-          $ref: '#/components/responses/404IndexNotFound'
+          description: Index not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                index-not-found:
+                  summary: Index not found
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Index example-index not found.
+                    status: 404
         '412':
-          $ref: '#/components/responses/412PendingCollection'
+          description: There is a pending collection created from this index.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                pending-collection:
+                  summary: There is a pending collection from this index.
+                  value:
+                    error:
+                      code: FAILED_PRECONDITION
+                      message: 'Unable to delete an index. There are pending collections for this index: [''test-collection'']'
+                    status: 412
         '500':
-          $ref: '#/components/responses/500InternalServerError'
-      tags:
-        - Manage Indexes
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
     patch:
+      tags:
+      - Manage Indexes
+      summary: Configure an index
+      description: |-
+        Configure an existing index. 
+        
+
+        For serverless indexes, you can configure only index deletion protection. For pod-based indexes, you can configure the pod size, number of replicas, and index deletion protection. 
+        
+        
+        It is not possible to change the pod type of a pod-based index. However, you can create a collection from a pod-based index and then [create a new pod-based index with a different pod type](http://docs.pinecone.io/guides/indexes/pods/create-a-pod-based-index#create-a-pod-index-from-a-collection) from the collection.
+        For guidance and examples, see [Configure an index](http://docs.pinecone.io/guides/indexes/pods/manage-pod-based-indexes).
       operationId: configure_index
-      summary: 'Configure an index'
-      description: >-
-        This operation configures the pod size and number of replicas for a pod-based index.
-        
-        
-        It is not possible to change the pod type of an index. However, you can create a collection from an index and then [create a new index with a different pod type](http://docs.pinecone.io/guides/indexes/pods/create-a-pod-based-index#create-a-pod-index-from-a-collection) from the collection.
       parameters:
-        - name: index_name
-          required: true
-          in: path
-          example: 'test-index'
-          schema:
-            type: string
-          description: The name of the index to configure.
+      - in: path
+        name: index_name
+        description: The name of the index to configure.
+        required: true
+        schema:
+          type: string
+        example: test-index
+        style: simple
       requestBody:
         description: The desired pod size and replica configuration for the index.
-        required: true
         content:
           application/json:
             schema:
@@ -319,7 +505,7 @@ paths:
                 value:
                   spec:
                     pod:
-                      pod_type: 'p1.x2'
+                      pod_type: p1.x2
               horizontal-scaling:
                 summary: Horizontal scaling with replicas
                 value:
@@ -331,94 +517,183 @@ paths:
                 value:
                   spec:
                     pod:
-                      pod_type: 'p1.x2'
+                      pod_type: p1.x2
                       replicas: 4
+              disable-deletion-protection:
+                summary: Disable deletion protection for the index
+                value:
+                  delete_protection: disabled
+        required: true
       responses:
         '202':
-          description: >-
-            The request to configure the index has been accepted. Check the 
-            index status to see when the change has been applied.
+          description: The request to configure the index has been accepted. Check the  index status to see when the change has been applied.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/IndexModel'
         '400':
-          $ref: '#/components/responses/400BadRequest'
+          description: Bad request. The request body included invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                index-metric-validation-error:
+                  summary: Validation error on metric.
+                  value:
+                    error:
+                      code: INVALID_ARGUMENT
+                      message: Metric must be cosine, euclidean, or dotproduct.
+                    status: 400
         '401':
-          $ref: '#/components/responses/401Unauthorized'
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
         '403':
-          $ref: '#/components/responses/403PodQuotaExceeded'
+          description: You've exceed your pod quota.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Forbidden
+                  value:
+                    error:
+                      code: FORBIDDEN
+                      message: Increase your quota or upgrade to create more indexes.
+                    status: 403
         '404':
-          $ref: '#/components/responses/404IndexNotFound'
+          description: Index not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                index-not-found:
+                  summary: Index not found
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Index example-index not found.
+                    status: 404
         '422':
-          $ref: '#/components/responses/422UnprocessableEntity'
+          description: Unprocessable entity. The request body could not be deserialized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missing-field:
+                  summary: Unprocessable entity
+                  value:
+                    error:
+                      code: UNPROCESSABLE_ENTITY
+                      message: 'Failed to deserialize the JSON body into the target type: missing field `metric` at line 1 column 16'
+                    status: 422
         '500':
-          $ref: '#/components/responses/500InternalServerError'
-      tags:
-        - Manage Indexes
-    servers:
-      - url: 'https://api.pinecone.io'
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
   /collections:
     get:
-      operationId: list_collections
-      summary: 'List collections'
-      description: >
+      tags:
+      - Manage Indexes
+      summary: List collections
+      description: |
         This operation returns a list of all collections in a project.
-        
-
         Serverless indexes do not support collections.
+      operationId: list_collections
       responses:
         '200':
-          description: >-
-            This operation returns a list of all the collections in your current project.
+          description: This operation returns a list of all the collections in your current project.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/CollectionList'
               examples:
                 multiple-collections:
-                  summary: 'Multiple collections with different states'
+                  summary: Multiple collections with different states
                   value:
                     collections:
-                      - name: 'small-collection'
-                        size: 3126700
-                        status: 'Ready'
-                        dimension: 3
-                        vector_count: 99
-                        environment: us-east1-gcp
-                      - name: 'small-collection-new'
-                        size: 3126700
-                        status: 'Initializing'
-                        dimension: 3
-                        vector_count: 99
-                        environment: us-east1-gcp
-                      - name: 'big-collection'
-                        size: 160087040000000
-                        status: 'Ready'
-                        dimension: 1536
-                        vector_count: 10000000
-                        environment: us-east1-gcp
+                    - dimension: 3
+                      environment: us-east1-gcp
+                      name: small-collection
+                      size: 3126700
+                      status: Ready
+                      vector_count: 99
+                    - dimension: 3
+                      environment: us-east1-gcp
+                      name: small-collection-new
+                      size: 3126700
+                      status: Initializing
+                      vector_count: 99
+                    - dimension: 1536
+                      environment: us-east1-gcp
+                      name: big-collection
+                      size: 160087040000000
+                      status: Ready
+                      vector_count: 10000000
                 no-collections:
-                  summary: 'No collections created yet'
+                  summary: No collections created yet
                   value:
                     collections: []
         '401':
-          $ref: '#/components/responses/401Unauthorized'
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
         '500':
-          $ref: '#/components/responses/500InternalServerError'
-      tags:
-        - Manage Indexes
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
     post:
+      tags:
+      - Manage Indexes
+      summary: Create a collection
+      description: "This operation creates a Pinecone collection.\n  \nServerless indexes do not support collections.\n"
       operationId: create_collection
-      summary: 'Create a collection'
-      description: >
-        This operation creates a Pinecone collection.
-        
-
-        Serverless indexes do not support collections.
       requestBody:
         description: The desired configuration for the collection.
-        required: true
         content:
           application/json:
             schema:
@@ -427,8 +702,9 @@ paths:
               creating-collection:
                 summary: Creating a collection
                 value:
-                  name: 'example-collection'
-                  source: 'example-source-index'
+                  name: example-collection
+                  source: example-source-index
+        required: true
       responses:
         '201':
           description: The collection has been successfully created.
@@ -437,11 +713,47 @@ paths:
               schema:
                 $ref: '#/components/schemas/CollectionModel'
         '400':
-          $ref: '#/components/responses/400BadRequest'
+          description: Bad request. The request body included invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                index-metric-validation-error:
+                  summary: Validation error on metric.
+                  value:
+                    error:
+                      code: INVALID_ARGUMENT
+                      message: Metric must be cosine, euclidean, or dotproduct.
+                    status: 400
         '401':
-          $ref: '#/components/responses/401Unauthorized'
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
         '403':
-          $ref: '#/components/responses/403CollectionsQuotaExceeded'
+          description: You've exceed your collections quota.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Forbidden
+                  value:
+                    error:
+                      code: FORBIDDEN
+                      message: Collection exceeds quota. Maximum allowed on your account is 1. Currently have 1.
+                    status: 403
         '409':
           description: Collection of given name already exists.
           content:
@@ -450,38 +762,58 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               examples:
                 collection-name-already-exists:
-                  summary: 'Collection name needs to be unique.'
+                  summary: Collection name needs to be unique.
                   value:
-                    status: 409
                     error:
-                      code: 'ALREADY_EXISTS'
-                      message: 'Resource already exists.'
+                      code: ALREADY_EXISTS
+                      message: Resource already exists.
+                    status: 409
         '422':
-          $ref: '#/components/responses/422UnprocessableEntity'
+          description: Unprocessable entity. The request body could not be deserialized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missing-field:
+                  summary: Unprocessable entity
+                  value:
+                    error:
+                      code: UNPROCESSABLE_ENTITY
+                      message: 'Failed to deserialize the JSON body into the target type: missing field `metric` at line 1 column 16'
+                    status: 422
         '500':
-          $ref: '#/components/responses/500InternalServerError'
-      tags:
-        - Manage Indexes
-    servers:
-      - url: 'https://api.pinecone.io'
-
-  '/collections/{collection_name}':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+  /collections/{collection_name}:
     get:
-      operationId: describe_collection
-      summary: 'Describe a collection'
-      description: >
+      tags:
+      - Manage Indexes
+      summary: Describe a collection
+      description: |
         This operation gets a description of a collection.
-
-
         Serverless indexes do not support collections.
+      operationId: describe_collection
       parameters:
-        - name: collection_name
-          required: true
-          in: path
-          description: The name of the collection to be described.
-          schema:
-            type: string
-          example: 'tiny-collection'
+      - in: path
+        name: collection_name
+        description: The name of the collection to be described.
+        required: true
+        schema:
+          type: string
+        example: tiny-collection
+        style: simple
       responses:
         '200':
           description: Configuration information and status of the collection.
@@ -491,654 +823,633 @@ paths:
                 $ref: '#/components/schemas/CollectionModel'
               examples:
                 tiny-collection:
-                  summary: 'A small collection.'
+                  summary: A small collection.
                   value:
-                    name: 'tiny-collection'
-                    size: 3126700
-                    status: 'Ready'
                     dimension: 3
-                    vector_count: 99
                     environment: us-east1-gcp
+                    name: tiny-collection
+                    size: 3126700
+                    status: Ready
+                    vector_count: 99
         '401':
-          $ref: '#/components/responses/401Unauthorized'
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
         '404':
-          $ref: '#/components/responses/404CollectionNotFound'
+          description: Collection not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                collection-not-found:
+                  summary: Collection not found.
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Collection example-collection not found.
+                    status: 404
         '500':
-          $ref: '#/components/responses/500InternalServerError'
-      tags:
-        - Manage Indexes
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
     delete:
-      operationId: delete_collection
-      summary: 'Delete a collection'
-      description: >
+      tags:
+      - Manage Indexes
+      summary: Delete a collection
+      description: |
         This operation deletes an existing collection.
-        
-
         Serverless indexes do not support collections.
+      operationId: delete_collection
       parameters:
-        - name: collection_name
-          required: true
-          in: path
-          schema:
-            type: string
-          description: The name of the collection.
-          example: 'test-collection'
+      - in: path
+        name: collection_name
+        description: The name of the collection.
+        required: true
+        schema:
+          type: string
+        example: test-collection
+        style: simple
       responses:
         '202':
           description: The collection has been successfully deleted.
         '401':
-          $ref: '#/components/responses/401Unauthorized'
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
         '404':
-          $ref: '#/components/responses/404CollectionNotFound'
+          description: Collection not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                collection-not-found:
+                  summary: Collection not found.
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Collection example-collection not found.
+                    status: 404
         '500':
-          $ref: '#/components/responses/500InternalServerError'
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+  /embed:
+    post:
       tags:
-        - Manage Indexes
-    servers:
-      - url: 'https://api.pinecone.io'
-
+      - Inference
+      summary: Generate vectors
+      description: |-
+        Generate vector embeddings for input data. This endpoint uses [Pinecone Inference](https://docs.pinecone.io/guides/inference/understanding-inference).
+        
+        For guidance and examples, see [Embed data](https://docs.pinecone.io/guides/inference/generate-embeddings).
+      operationId: embed
+      requestBody:
+        description: Generate embeddings for inputs.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmbedRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbeddingsList'
+        '400':
+          description: Bad request. The request body included invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                index-metric-validation-error:
+                  summary: Validation error on metric.
+                  value:
+                    error:
+                      code: INVALID_ARGUMENT
+                      message: Metric must be cosine, euclidean, or dotproduct.
+                    status: 400
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
 components:
   schemas:
-    # Data Models
-    IndexModel:
+    DeletionProtection:
+      description: |
+        Whether [deletion protection](http://docs.pinecone.io/guides/indexes/manage-indexes#configure-deletion-protection) is enabled/disabled for the index.
+      default: disabled
+      type: string
+      enum:
+      - disabled
+      - enabled
+    CreateIndexRequest:
+      description: The configuration needed to create a Pinecone index.
       type: object
-      description: >-
-        The IndexModel describes the configuration and status of a
-        Pinecone index.
-      required:
-        - name
-        - dimension
-        - metric
-        - status
-        - spec
-        - host
       properties:
         name:
-          $ref: '#/components/schemas/IndexName'
+          example: example-index
+          description: |
+            The name of the index. Resource name must be 1-45 characters long, start and end with an alphanumeric character, and consist only of lower case alphanumeric characters or '-'.
+          type: string
+          minLength: 1
+          maxLength: 45
         dimension:
-          $ref: '#/components/schemas/IndexDimension'
+          example: 1536
+          description: The dimensions of the vectors to be inserted in the index.
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 20000
         metric:
-          $ref: '#/components/schemas/IndexMetric'
-        host:
-          $ref: '#/components/schemas/IndexHost'
+          description: The distance metric to be used for similarity search. You can use 'euclidean', 'cosine', or 'dotproduct'.
+          default: cosine
+          type: string
+          enum:
+          - cosine
+          - euclidean
+          - dotproduct
+        deletion_protection:
+          $ref: '#/components/schemas/DeletionProtection'
         spec:
+          $ref: '#/components/schemas/IndexSpec'
+      required:
+      - name
+      - dimension
+      - spec
+    CreateCollectionRequest:
+      description: The configuration needed to create a Pinecone collection.
+      type: object
+      properties:
+        name:
+          description: |
+            The name of the collection to be created. Resource name must be 1-45 characters long, start and end with an alphanumeric character, and consist only of lower case alphanumeric characters or '-'.
+          type: string
+          minLength: 1
+          maxLength: 45
+        source:
+          example: example-source-index
+          description: The name of the index to be used as the source for the collection.
+          type: string
+      required:
+      - name
+      - source
+    CollectionList:
+      description: The list of collections that exist in the project.
+      type: object
+      properties:
+        collections:
+          type: array
+          items:
+            $ref: '#/components/schemas/CollectionModel'
+    EmbeddingsList:
+      description: Embeddings generated for the input
+      type: object
+      properties:
+        model:
+          example: multilingual-e5-large
+          type: string
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Embedding'
+        usage:
+          description: Usage statistics for the model inference.
+          type: object
+          properties:
+            total_tokens:
+              example: 205
+              type: integer
+    ConfigureIndexRequest:
+      description: Configuration used to scale an index.
+      type: object
+      properties:
+        spec:
+          type: object
+          properties:
+            pod:
+              type: object
+              properties:
+                replicas:
+                  description: The number of replicas. Replicas duplicate your index. They provide higher availability and throughput. Replicas can be scaled up or down as your needs change.
+                  default: 1
+                  type: integer
+                  format: int32
+                  minimum: 1
+                pod_type:
+                  description: The type of pod to use. One of `s1`, `p1`, or `p2` appended with `.` and one of `x1`, `x2`, `x4`, or `x8`.
+                  default: p1.x1
+                  type: string
+          required:
+          - pod
+        deletion_protection:
+          $ref: '#/components/schemas/DeletionProtection'
+    IndexSpec:
+      description: |
+        The spec object defines how the index should be deployed.
+
+        For serverless indexes, you define only the [cloud and region](http://docs.pinecone.io/guides/indexes/understanding-indexes#cloud-regions) where the index should be hosted. For pod-based indexes, you define the [environment](http://docs.pinecone.io/guides/indexes/pods/understanding-pod-based-indexes#pod-environments) where the index should be hosted, the [pod type and size](http://docs.pinecone.io/guides/indexes/pods/understanding-pod-based-indexes#pod-types) to use, and other index characteristics.
+      type: object
+      properties:
+        serverless:
+          $ref: '#/components/schemas/ServerlessSpec'
+        pod:
+          $ref: '#/components/schemas/PodSpec'
+      additionalProperties: false
+      oneOf:
+      - required:
+        - serverless
+      - required:
+        - pod
+    EmbedRequest:
+      description: Generate embeddings for inputs.
+      type: object
+      properties:
+        model:
+          example: multilingual-e5-large
+          type: string
+        parameters:
+          description: Model-specific parameters.
+          type: object
+          properties:
+            input_type:
+              example: query
+              description: Common property used to distinguish between types of data.
+              type: string
+            truncate:
+              example: END
+              description: How to handle inputs longer than those supported by the model. If NONE, when the input exceeds the maximum input token length an error will be returned.
+              default: END
+              type: string
+        inputs:
+          type: array
+          items:
+            type: object
+            properties:
+              text:
+                example: The quick brown fox jumps over the lazy dog.
+                type: string
+      required:
+      - model
+      - inputs
+    IndexList:
+      description: The list of indexes that exist in the project.
+      type: object
+      properties:
+        indexes:
+          type: array
+          items:
+            $ref: '#/components/schemas/IndexModel'
+    CollectionModel:
+      description: The CollectionModel describes the configuration and status of a Pinecone collection.
+      type: object
+      properties:
+        name:
+          example: example-collection
+          description: The name of the collection.
+          type: string
+        size:
+          example: 10000000
+          description: The size of the collection in bytes.
+          type: integer
+          format: int64
+        status:
+          example: Initializing
+          description: The status of the collection.
+          type: string
+          enum:
+          - Initializing
+          - Ready
+          - Terminating
+        dimension:
+          example: 1536
+          description: The dimension of the vectors stored in each record held in the collection.
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 20000
+        vector_count:
+          example: 120000
+          description: The number of records stored in the collection.
+          type: integer
+          format: int32
+        environment:
+          example: us-east1-gcp
+          description: The environment where the collection is hosted.
+          type: string
+      required:
+      - name
+      - status
+      - environment
+    ServerlessSpec:
+      description: Configuration needed to deploy a serverless index.
+      type: object
+      properties:
+        cloud:
+          example: aws
+          description: The public cloud where you would like your index hosted.
+          type: string
+          enum:
+          - gcp
+          - aws
+          - azure
+        region:
+          example: us-east-1
+          description: 'The region where you would like your index to be created. '
+          type: string
+      required:
+      - cloud
+      - region
+    PodSpec:
+      example:
+        environment: us-east1-gcp
+        metadata_config:
+          indexed:
+          - genre
+          - title
+          - imdb_rating
+        pod_type: p1.x1
+        pods: 1
+        replicas: 1
+        shards: 1
+        source_collection: movie-embeddings
+      description: Configuration needed to deploy a pod-based index.
+      type: object
+      properties:
+        environment:
+          example: us-east1-gcp
+          description: The environment where the index is hosted.
+          type: string
+        replicas:
+          description: The number of replicas. Replicas duplicate your index. They provide higher availability and throughput. Replicas can be scaled up or down as your needs change.
+          default: 1
+          type: integer
+          format: int32
+          minimum: 1
+        shards:
+          description: The number of shards. Shards split your data across multiple pods so you can fit more data into an index.
+          default: 1
+          type: integer
+          format: int32
+          minimum: 1
+        pod_type:
+          description: The type of pod to use. One of `s1`, `p1`, or `p2` appended with `.` and one of `x1`, `x2`, `x4`, or `x8`.
+          default: p1.x1
+          type: string
+        pods:
+          example: 1
+          description: The number of pods to be used in the index. This should be equal to `shards` x `replicas`.'
+          default: 1
+          type: integer
+          minimum: 1
+        metadata_config:
+          example:
+            indexed:
+            - genre
+            - title
+            - imdb_rating
+          description: Configuration for the behavior of Pinecone's internal metadata index. By default, all metadata is indexed; when `metadata_config` is present, only specified metadata fields are indexed. These configurations are only valid for use with pod-based indexes.
+          type: object
+          properties:
+            indexed:
+              description: By default, all metadata is indexed; to change this behavior, use this property to specify an array of metadata fields that should be indexed.
+              type: array
+              items:
+                type: string
+        source_collection:
+          example: movie-embeddings
+          description: The name of the collection to be used as the source for the index.
+          type: string
+      required:
+      - environment
+      - pod_type
+    ErrorResponse:
+      example:
+        error:
+          code: QUOTA_EXCEEDED
+          message: The index exceeds the project quota of 5 pods by 2 pods. Upgrade your account or change the project settings to increase the quota.
+        status: 429
+      description: The response shape used for all error responses.
+      type: object
+      properties:
+        status:
+          example: 500
+          description: The HTTP status code of the error.
+          type: integer
+        error:
+          example:
+            code: INVALID_ARGUMENT
+            message: Index name must contain only lowercase alphanumeric characters or hyphens, and must not begin or end with a hyphen.
+          description: Detailed information about the error that occurred.
+          type: object
+          properties:
+            code:
+              type: string
+              enum:
+              - OK
+              - UNKNOWN
+              - INVALID_ARGUMENT
+              - DEADLINE_EXCEEDED
+              - QUOTA_EXCEEDED
+              - NOT_FOUND
+              - ALREADY_EXISTS
+              - PERMISSION_DENIED
+              - UNAUTHENTICATED
+              - RESOURCE_EXHAUSTED
+              - FAILED_PRECONDITION
+              - ABORTED
+              - OUT_OF_RANGE
+              - UNIMPLEMENTED
+              - INTERNAL
+              - UNAVAILABLE
+              - DATA_LOSS
+              - FORBIDDEN
+              - UNPROCESSABLE_ENTITY
+            message:
+              example: Index name must contain only lowercase alphanumeric characters or hyphens, and must not begin or end with a hyphen.
+              type: string
+            details:
+              description: Additional information about the error. This field is not guaranteed to be present.
+              type: object
+          required:
+          - code
+          - message
+      required:
+      - status
+      - error
+    Embedding:
+      description: Embedding of a single input
+      type: object
+      properties:
+        values:
+          example:
+          - 0.1
+          - 0.2
+          - 0.3
+          description: The embedding values.
+          type: array
+          items:
+            type: number
+    IndexModel:
+      description: The IndexModel describes the configuration and status of a Pinecone index.
+      type: object
+      properties:
+        name:
+          example: example-index
+          description: |
+            The name of the index. Resource name must be 1-45 characters long, start and end with an alphanumeric character, and consist only of lower case alphanumeric characters or '-'.
+          type: string
+          minLength: 1
+          maxLength: 45
+        dimension:
+          example: 1536
+          description: The dimensions of the vectors to be inserted in the index.
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 20000
+        metric:
+          description: The distance metric to be used for similarity search. You can use 'euclidean', 'cosine', or 'dotproduct'.
+          default: cosine
+          type: string
+          enum:
+          - cosine
+          - euclidean
+          - dotproduct
+        host:
+          example: semantic-search-c01b5b5.svc.us-west1-gcp.pinecone.io
+          description: The URL address where the index is hosted.
+          type: string
+        deletion_protection:
+          $ref: '#/components/schemas/DeletionProtection'
+        spec:
+          example:
+            pod:
+              environment: us-east-1-aws
+              metadata_config:
+                indexed:
+                - genre
+                - title
+                - imdb_rating
+              pod_type: p1.x1
+              pods: 1
+              replicas: 1
+              shards: 1
           type: object
           properties:
             pod:
               $ref: '#/components/schemas/PodSpec'
             serverless:
               $ref: '#/components/schemas/ServerlessSpec'
-          example:
-            pod:
-              environment: 'us-east-1-aws'
-              replicas: 1
-              shards: 1
-              pod_type: 'p1.x1'
-              pods: 1
-              metadata_config:
-                indexed:
-                  - 'genre'
-                  - 'title'
-                  - 'imdb_rating'
         status:
-          type: object
-          required:
-            - ready
-            - state
           example:
             ready: true
-            state: 'ScalingUpPodSize'
+            state: ScalingUpPodSize
+          type: object
           properties:
             ready:
               type: boolean
             state:
               type: string
               enum:
-                - Initializing
-                - InitializationFailed
-                - ScalingUp
-                - ScalingDown
-                - ScalingUpPodSize
-                - ScalingDownPodSize
-                - Terminating
-                - Ready
-
-    CollectionModel:
-      type: object
-      description: >-
-        The CollectionModel describes the configuration and status of a
-        Pinecone collection.
-      required:
-        - name
-        - status
-        - environment
-      properties:
-        name:
-          type: string
-          description: The name of the collection.
-          example: example-collection
-        size:
-          type: integer
-          description: The size of the collection in bytes.
-          example: 10000000
-          format: int64
-        status:
-          type: string
-          description: The status of the collection.
-          enum:
-            - Initializing
-            - Ready
-            - Terminating
-          example: Initializing
-        dimension:
-          type: integer
-          description: The dimension of the vectors stored in each record held in the collection.
-          example: 1536
-          minimum: 1
-          maximum: 2000
-          format: int32
-        vector_count:
-          type: integer
-          example: 120000
-          format: int32
-          description: The number of records stored in the collection.
-        environment:
-          type: string
-          description: >-
-            The environment where the collection is hosted.
-          example: 'us-east1-gcp'
-
-    # Properties of the IndexModel
-    IndexMetric:
-      type: string
-      description: >-
-        The distance metric to be used for similarity search. You can use
-        'euclidean', 'cosine', or 'dotproduct'.
-      enum:
-        - cosine
-        - euclidean
-        - dotproduct
-      default: cosine
-    IndexName:
-      type: string
-      minLength: 1
-      maxLength: 45
-      description: >
-        The name of the index. Resource name must be 1-45 characters long, start and end with an alphanumeric character,
-        and consist only of lower case alphanumeric characters or '-'.
-      example: example-index
-    IndexDimension:
-      type: integer
-      description: The dimensions of the vectors to be inserted in the index.
-      minimum: 1
-      maximum: 20000
-      example: 1536
-      format: int32
-    IndexHost:
-      type: string
-      description: >-
-        The URL address where the index is hosted.
-      example: 'semantic-search-c01b5b5.svc.us-west1-gcp.pinecone.io'
-
-    # Properties of the spec object for pod-based indexes
-    PodSpec:
-      type: object
-      description: Configuration needed to deploy a pod-based index.
-      required:
-        - environment
-        - pods
-        - replicas
-        - shards
-        - pod_type
-      example:
-        environment: 'us-east1-gcp'
-        replicas: 1
-        shards: 1
-        pod_type: 'p1.x1'
-        pods: 1
-        metadata_config:
-          indexed:
-            - 'genre'
-            - 'title'
-            - 'imdb_rating'
-        source_collection: 'movie-embeddings'
-      properties:
-        environment:
-          type: string
-          description: >-
-            The environment where the index is hosted.
-          example: 'us-east1-gcp'
-        replicas:
-          $ref: '#/components/schemas/PodSpecReplicas'
-        shards:
-          $ref: '#/components/schemas/PodSpecShards'
-        pod_type:
-          $ref: '#/components/schemas/PodSpecPodType'
-        pods:
-          type: integer
-          description: >-
-            The number of pods to be used in the index. This should be equal to
-            `shards` x `replicas`.'
-          default: 1
-          example: 1
-          minimum: 1
-        metadata_config:
-          type: object
-          description: >-
-            Configuration for the behavior of Pinecone's internal metadata index. By
-            default, all metadata is indexed; when `metadata_config` is present,
-            only specified metadata fields are indexed. These configurations are
-            only valid for use with pod-based indexes.
-          properties:
-            indexed:
-              type: array
-              description: >-
-                By default, all metadata is indexed; to change this behavior, use
-                this property to specify an array of metadata fields that should be
-                indexed.
-              items:
-                type: string
-          example:
-            indexed:
-              - 'genre'
-              - 'title'
-              - 'imdb_rating'
-        source_collection:
-          type: string
-          description: >-
-            The name of the collection to be used as the source for the index.
-          example: 'movie-embeddings'
-    PodSpecPodType:
-      type: string
-      description: >-
-        The type of pod to use. One of `s1`, `p1`, or `p2` appended with `.` and
-        one of `x1`, `x2`, `x4`, or `x8`.
-      default: p1.x1
-    PodSpecReplicas:
-      type: integer
-      format: int32
-      description: >-
-        The number of replicas. Replicas duplicate your index. They provide
-        higher availability and throughput. Replicas can be scaled up or down
-        as your needs change.
-      default: 1
-      minimum: 1
-    PodSpecShards:
-      type: integer
-      format: int32
-      description: >-
-        The number of shards. Shards split your data across multiple pods so you
-        can fit more data into an index.
-      default: 1
-      minimum: 1
-
-    # Properties of the spec object for serverless indexes
-    ServerlessSpec:
-      type: object
-      required:
-        - cloud
-        - region
-      description: Configuration needed to deploy a serverless index.
-      properties:
-        cloud:
-          type: string
-          enum:
-            - gcp
-            - aws
-            - azure
-          description: >-
-            The public cloud where you would like your index hosted.
-          example: aws
-        region:
-          type: string
-          description: >-
-            The region where you would like your index to be created. 
-          example: us-east-1
-
-    # Shape of error responses
-    ErrorResponse:
-      type: object
-      description: The response shape used for all error responses.
-      required:
-        - status
-        - error
-      properties:
-        status:
-          type: integer
-          description: The HTTP status code of the error.
-          example: 500
-        error:
-          type: object
-          description: Detailed information about the error that occurred.
+              - Initializing
+              - InitializationFailed
+              - ScalingUp
+              - ScalingDown
+              - ScalingUpPodSize
+              - ScalingDownPodSize
+              - Terminating
+              - Ready
           required:
-            - code
-            - message
-          properties:
-            code:
-              type: string
-              enum:
-                - OK
-                - UNKNOWN
-                - INVALID_ARGUMENT
-                - DEADLINE_EXCEEDED
-                - QUOTA_EXCEEDED
-                - NOT_FOUND
-                - ALREADY_EXISTS
-                - PERMISSION_DENIED
-                - UNAUTHENTICATED
-                - RESOURCE_EXHAUSTED
-                - FAILED_PRECONDITION
-                - ABORTED
-                - OUT_OF_RANGE
-                - UNIMPLEMENTED
-                - INTERNAL
-                - UNAVAILABLE
-                - DATA_LOSS
-                - FORBIDDEN
-            message:
-              type: string
-              example: Index name must contain only lowercase alphanumeric characters or hyphens, and must not begin or end with a hyphen.
-            details:
-              description: >-
-                Additional information about the error. This field is not
-                guaranteed to be present.
-              type: object
-          example:
-            code: 'INVALID_ARGUMENT'
-            message: 'Index name must contain only lowercase alphanumeric characters or hyphens, and must not begin or end with a hyphen.'
-      example:
-        status: 429
-        error:
-          code: 'QUOTA_EXCEEDED'
-          message: 'The index exceeds the project quota of 5 pods by 2 pods. Upgrade your account or change the project settings to increase the quota.'
-
-    IndexList:
-      type: object
-      description: The list of indexes that exist in the project.
-      properties:
-        indexes:
-          type: array
-          items:
-            $ref: '#/components/schemas/IndexModel'
-
-    CollectionList:
-      type: object
-      description: The list of collections that exist in the project.
-      properties:
-        collections:
-          type: array
-          items:
-            $ref: '#/components/schemas/CollectionModel'
-
-    # Request bodies
-    CreateIndexRequest:
-      type: object
-      description: >-
-        The configuration needed to create a Pinecone index.
+          - ready
+          - state
       required:
-        - name
-        - dimension
-        - spec
-      properties:
-        name:
-          $ref: '#/components/schemas/IndexName'
-        dimension:
-          $ref: '#/components/schemas/IndexDimension'
-        metric:
-          $ref: '#/components/schemas/IndexMetric'
-        spec:
-          type: object
-          description: >
-            The spec object defines how the index should be deployed.
-
-
-            For serverless indexes, you define only the [cloud and region](http://docs.pinecone.io/guides/indexes/understanding-indexes#cloud-regions) where the index should be hosted. For pod-based indexes, you define the [environment](http://docs.pinecone.io/guides/indexes/pods/understanding-pod-based-indexes#pod-environments) where the index should be hosted, the [pod type and size](http://docs.pinecone.io/guides/indexes/pods/understanding-pod-based-indexes#pod-types) to use, and other index characteristics.
-          additionalProperties: false
-          properties:
-            serverless:
-              $ref: '#/components/schemas/ServerlessSpec'
-            pod:
-              type: object
-              description: >-
-                Configuration needed to deploy a pod-based index.
-              required:
-                - environment
-                - pod_type
-              properties:
-                environment:
-                  type: string
-                  description: >-
-                    The environment where the index is hosted.
-                  example: 'us-east1-gcp'
-                replicas:
-                  $ref: '#/components/schemas/PodSpecReplicas'
-                pod_type:
-                  $ref: '#/components/schemas/PodSpecPodType'
-                pods:
-                  type: integer
-                  description: >-
-                    The number of pods to be used in the index. This should be equal to `shards` x `replicas`.
-                  example: 1
-                  minimum: 1
-                shards:
-                  $ref: '#/components/schemas/PodSpecShards'
-                metadata_config:
-                  type: object
-                  description: >-
-                    Configuration for the behavior of Pinecone's internal metadata index. By
-                    default, all metadata is indexed; when `metadata_config` is present,
-                    only specified metadata fields are indexed. These configurations are
-                    only valid for use with pod-based indexes.
-                  properties:
-                    indexed:
-                      type: array
-                      description: >-
-                        By default, all metadata is indexed; to change this behavior, use
-                        this property to specify an array of metadata fields which should be
-                        indexed.
-                      items:
-                        type: string
-                  example:
-                    indexed:
-                      - 'genre'
-                      - 'title'
-                      - 'imdb_rating'
-                source_collection:
-                  type: string
-                  description: >-
-                    The name of the collection to be used as the source for the index.
-                  example: 'movie-embeddings'
-          oneOf:
-            - required: [serverless]
-            - required: [pod]
-    CreateCollectionRequest:
-      type: object
-      description: >-
-        The configuration needed to create a Pinecone collection.
-      required:
-        - name
-        - source
-      properties:
-        name:
-          type: string
-          minLength: 1
-          maxLength: 45
-          description: >
-            The name of the collection to be created. Resource name must be 1-45 characters long, start and end with an alphanumeric character,
-            and consist only of lower case alphanumeric characters or '-'.
-        source:
-          type: string
-          description: The name of the index to be used as the source for the collection.
-          example: example-source-index
-    ConfigureIndexRequest:
-      type: object
-      description: >-
-        Configuration used to scale an index.
-      required: ['spec']
-      properties:
-        spec:
-          type: object
-          required: ['pod']
-          properties:
-            pod:
-              type: object
-              properties:
-                replicas:
-                  $ref: '#/components/schemas/PodSpecReplicas'
-                pod_type:
-                  $ref: '#/components/schemas/PodSpecPodType'
-
-  responses:
-    '400BadRequest':
-      description: Bad request. The request body included invalid request parameters.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            index-metric-validation-error:
-              summary: 'Validation error on metric.'
-              value:
-                status: 400
-                error:
-                  code: 'INVALID_ARGUMENT'
-                  message: 'Metric must be cosine, euclidean, or dotproduct.'
-    '401Unauthorized':
-      description: 'Unauthorized. Possible causes: Invalid API key.'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            unauthorized:
-              summary: 'Unauthorized'
-              value:
-                status: 401
-                error:
-                  code: 'UNAUTHENTICATED'
-                  message: 'Invalid API key.'
-    '403CollectionsQuotaExceeded':
-      description: "You've exceed your collections quota."
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            unauthorized:
-              summary: 'Forbidden'
-              value:
-                status: 403
-                error:
-                  code: 'FORBIDDEN'
-                  message: Collection exceeds quota. Maximum allowed on your account is 1. Currently have 1.
-    '403PodQuotaExceeded':
-      description: "You've exceed your pod quota."
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            unauthorized:
-              summary: 'Forbidden'
-              value:
-                status: 403
-                error:
-                  code: 'FORBIDDEN'
-                  message: Increase your quota or upgrade to create more indexes.
-    '404ServerlessSpecNotFound':
-      description: Unknown cloud or region when creating a serverless index.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            serverless-spec-cloud-not-found:
-              summary: 'Cannot create serverless index with invalid spec.'
-              value:
-                status: 404
-                error:
-                  code: 'NOT_FOUND'
-                  message: 'Resource cloud: aws region: us-west1 not found.'
-    '404IndexNotFound':
-      description: Index not found.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            index-not-found:
-              summary: 'Index not found'
-              value:
-                status: 404
-                error:
-                  code: 'NOT_FOUND'
-                  message: 'Index example-index not found.'
-    '404CollectionNotFound':
-      description: Collection not found.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            collection-not-found:
-              summary: 'Collection not found.'
-              value:
-                status: 404
-                error:
-                  code: 'NOT_FOUND'
-                  message: 'Collection example-collection not found.'
-    '412PendingCollection':
-      description: There is a pending collection created from this index.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            pending-collection:
-              summary: 'There is a pending collection from this index.'
-              value:
-                status: 412
-                error:
-                  code: 'FAILED_PRECONDITION'
-                  message: >- 
-                    Unable to delete an index. There are pending collections for this index: ['test-collection']
-    '422UnprocessableEntity':
-      description: >-
-        Unprocessable entity. The request body could not be deserialized.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            missing-field:
-              summary: 'Unprocessable entity'
-              value:
-                status: 422
-                error:
-                  code: 'INVALID_ARGUMENT'
-                  message: 'Failed to deserialize the JSON body into the target type: missing field `metric` at line 1 column 16'
-    '500InternalServerError':
-      description: Internal server error.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            internal-server-error:
-              summary: 'Internal server error'
-              value:
-                status: 500
-                error:
-                  code: 'UNKNOWN'
-                  message: 'Internal server error'
+      - name
+      - dimension
+      - metric
+      - status
+      - spec
+      - host
   securitySchemes:
     ApiKeyAuth:
       type: apiKey
-      name: Api-Key
-      description: "An API Key is required to call Pinecone APIs. Get yours from the [console](https://app.pinecone.io/)."
       in: header
-
+      name: Api-Key
+      description: An API Key is required to call Pinecone APIs. Get yours from the [console](https://app.pinecone.io/).
 security:
-  - ApiKeyAuth: []
-
-
+- ApiKeyAuth: []
+tags:
+- name: Inference
+  description: Generate embeddings for input data.
+- name: Manage Indexes
+  description: Actions that manage indexes
+externalDocs:
+  description: More Pinecone.io API docs
+  url: https://docs.pinecone.io/introduction
