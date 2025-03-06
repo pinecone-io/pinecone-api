@@ -9,7 +9,7 @@ info:
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0
-  version: 2024-10
+  version: 2025-01
 servers:
 - url: https://api.pinecone.io
   description: Production API endpoints
@@ -94,49 +94,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                model:
-                  example: bge-reranker-v2-m3
-                  description: The [model](https://docs.pinecone.io/guides/inference/understanding-inference#reranking-models) to use for reranking.
-                  type: string
-                query:
-                  example: What is the capital of France?
-                  description: The query to rerank documents against.
-                  type: string
-                top_n:
-                  example: 5
-                  description: The number of results to return sorted by relevance. Defaults to the number of inputs.
-                  type: integer
-                return_documents:
-                  example: true
-                  description: Whether to return the documents in the response.
-                  default: true
-                  type: boolean
-                rank_fields:
-                  description: |
-                    The field(s) to consider for reranking. If not provided, the default is `["text"]`.
-
-                    The number of fields supported is [model-specific](https://docs.pinecone.io/guides/inference/understanding-inference#reranking-models).
-                  default:
-                  - text
-                  type: array
-                  items:
-                    type: string
-                documents:
-                  description: The documents to rerank.
-                  type: array
-                  items:
-                    $ref: '#/components/schemas/Document'
-                parameters:
-                  description: Additional model-specific parameters for the reranker.
-                  type: object
-                  additionalProperties:
-                    type: string
-              required:
-              - model
-              - documents
-              - query
+              $ref: '#/components/schemas/RerankRequest'
       responses:
         '200':
           description: OK
@@ -188,13 +146,196 @@ paths:
                     status: 500
 components:
   schemas:
+    RerankRequest:
+      type: object
+      properties:
+        model:
+          example: bge-reranker-v2-m3
+          description: The [model](https://docs.pinecone.io/guides/inference/understanding-inference#reranking-models) to use for reranking.
+          type: string
+        query:
+          example: What is the capital of France?
+          description: The query to rerank documents against.
+          type: string
+        top_n:
+          example: 5
+          description: The number of results to return sorted by relevance. Defaults to the number of inputs.
+          type: integer
+        return_documents:
+          example: true
+          description: Whether to return the documents in the response.
+          default: true
+          type: boolean
+        rank_fields:
+          description: |
+            The field(s) to consider for reranking. If not provided, the default is `["text"]`.
+
+            The number of fields supported is [model-specific](https://docs.pinecone.io/guides/inference/understanding-inference#reranking-models).
+          default:
+          - text
+          type: array
+          items:
+            type: string
+        documents:
+          description: The documents to rerank.
+          type: array
+          items:
+            $ref: '#/components/schemas/Document'
+        parameters:
+          example:
+            truncate: END
+          description: Additional model-specific parameters. Refer to the [model guide](https://docs.pinecone.io/guides/inference/understanding-inference#reranking-models) for available model parameters.
+          type: object
+          additionalProperties: true
+      required:
+      - model
+      - documents
+      - query
+    SparseEmbedding:
+      description: A sparse embedding of a single input
+      type: object
+      properties:
+        sparse_values:
+          example:
+          - 0.1
+          - 0.2
+          - 0.3
+          description: The sparse embedding values.
+          type: array
+          items:
+            type: number
+            format: float
+        sparse_indices:
+          example:
+          - 10
+          - 3
+          - 156
+          description: The sparse embedding indices.
+          type: array
+          items:
+            type: integer
+            format: int32
+            minimum: 0
+        sparse_tokens:
+          example:
+          - quick
+          - brown
+          - fox
+          description: The normalized tokens used to create the sparse embedding.
+          type: array
+          items:
+            type: string
+        vector_type:
+          $ref: '#/components/schemas/VectorType'
+      required:
+      - sparse_values
+      - sparse_indices
+      - vector_type
+    RerankResult:
+      description: The result of a reranking request.
+      type: object
+      properties:
+        model:
+          example: bge-reranker-v2-m3
+          description: The model used to rerank documents.
+          type: string
+        data:
+          description: The reranked documents.
+          type: array
+          items:
+            $ref: '#/components/schemas/RankedDocument'
+        usage:
+          description: Usage statistics for the model inference.
+          type: object
+          properties:
+            rerank_units:
+              example: 1
+              description: The number of rerank units consumed by this operation.
+              type: integer
+              format: int32
+              minimum: 0
+      required:
+      - model
+      - data
+      - usage
+    RankedDocument:
+      description: A ranked document with a relevance score and an index position.
+      type: object
+      properties:
+        index:
+          description: The index position of the document from the original request.
+          type: integer
+        score:
+          example: 0.5
+          description: The relevance of the document to the query, normalized between 0 and 1, with scores closer to 1 indicating higher relevance.
+          type: number
+        document:
+          $ref: '#/components/schemas/Document'
+      required:
+      - index
+      - score
+    EmbedRequest:
+      type: object
+      properties:
+        model:
+          example: multilingual-e5-large
+          description: The [model](https://docs.pinecone.io/guides/inference/understanding-inference#embedding-models) to use for embedding generation.
+          type: string
+        parameters:
+          example:
+            input_type: passage
+            truncate: END
+          description: Additional model-specific parameters. Refer to the [model guide](https://docs.pinecone.io/guides/inference/understanding-inference#embedding-models) for available model parameters.
+          type: object
+          additionalProperties: true
+        inputs:
+          description: List of inputs to generate embeddings for.
+          type: array
+          items:
+            type: object
+            properties:
+              text:
+                example: The quick brown fox jumps over the lazy dog.
+                type: string
+      required:
+      - model
+      - inputs
+    VectorType:
+      description: Indicates whether this is a 'dense' or 'sparse' embedding.
+      type: string
+      enum:
+      - dense
+      - sparse
+    DenseEmbedding:
+      description: A dense embedding of a single input
+      type: object
+      properties:
+        values:
+          example:
+          - 0.1
+          - 0.2
+          - 0.3
+          description: The dense embedding values.
+          type: array
+          items:
+            type: number
+            format: float
+        vector_type:
+          $ref: '#/components/schemas/VectorType'
+      required:
+      - values
+      - vector_type
     EmbeddingsList:
-      description: Embeddings generated for the input
+      description: Embeddings generated for the input.
       type: object
       properties:
         model:
           example: multilingual-e5-large
           description: The model used to generate the embeddings
+          type: string
+        vector_type:
+          example: dense
+          description: Indicates whether the response data contains 'dense' or 'sparse' embeddings.
           type: string
         data:
           description: The embeddings generated for the inputs.
@@ -209,58 +350,13 @@ components:
               example: 205
               description: Total number of tokens consumed across all inputs.
               type: integer
+              format: int32
+              minimum: 0
       required:
       - model
+      - vector_type
       - data
       - usage
-    EmbedRequest:
-      type: object
-      properties:
-        model:
-          example: multilingual-e5-large
-          description: The [model](https://docs.pinecone.io/guides/inference/understanding-inference#embedding-models) to use for embedding generation.
-          type: string
-        parameters:
-          description: Model-specific parameters.
-          type: object
-          properties:
-            input_type:
-              example: query
-              description: Common property used to distinguish between types of data.
-              type: string
-            truncate:
-              example: END
-              description: "How to handle inputs longer than those supported by the model. If `\"END\"`, truncate the input sequence at the token limit. If `\"NONE\"`, return an error when the input exceeds the token limit. \n"
-              default: END
-              type: string
-        inputs:
-          description: List of inputs to generate embeddings for.
-          type: array
-          items:
-            type: object
-            properties:
-              text:
-                example: The quick brown fox jumps over the lazy dog.
-                type: string
-      required:
-      - model
-      - inputs
-    RankedDocument:
-      description: A ranked document with a relevance score and an index position.
-      type: object
-      properties:
-        index:
-          description: The index of the document
-          type: integer
-        score:
-          example: 0.5
-          description: 'The relevance of the document to the query, normalized between 0 and 1, with scores closer to 1 indicating higher relevance.'
-          type: number
-        document:
-          $ref: '#/components/schemas/Document'
-      required:
-      - index
-      - score
     Document:
       example:
         id: '1'
@@ -269,8 +365,7 @@ components:
         url: https://example.com
       description: Document for reranking
       type: object
-      additionalProperties:
-        type: string
+      additionalProperties: true
     ErrorResponse:
       example:
         error:
@@ -326,41 +421,15 @@ components:
       - error
     Embedding:
       description: Embedding of a single input
+      discriminator:
+        propertyName: vector_type
+        mapping:
+          dense: '#/components/schemas/DenseEmbedding'
+          sparse: '#/components/schemas/SparseEmbedding'
       type: object
-      properties:
-        values:
-          example:
-          - 0.1
-          - 0.2
-          - 0.3
-          description: The embedding values.
-          type: array
-          items:
-            type: number
-    RerankResult:
-      description: The result of a reranking request.
-      type: object
-      properties:
-        model:
-          example: bge-reranker-v2-m3
-          description: The model used to rerank documents.
-          type: string
-        data:
-          description: The reranked documents.
-          type: array
-          items:
-            $ref: '#/components/schemas/RankedDocument'
-        usage:
-          description: Usage statistics for the model inference.
-          type: object
-          properties:
-            rerank_units:
-              example: 1
-              type: integer
-      required:
-      - model
-      - data
-      - usage
+      oneOf:
+      - $ref: '#/components/schemas/DenseEmbedding'
+      - $ref: '#/components/schemas/SparseEmbedding'
   securitySchemes:
     ApiKeyAuth:
       type: apiKey
