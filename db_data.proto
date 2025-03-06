@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option go_package = "github.com/pinecone-io/go-pinecone/internal/gen/data";
+option go_package = "github.com/pinecone-io/go-pinecone/internal/gen/db_data/grpc";
 option java_package = "io.pinecone.proto";
 option java_multiple_files = true;
 
@@ -298,7 +298,7 @@ message DescribeIndexStatsResponse {
   //
   // Serverless indexes scale automatically as needed, so index fullness is relevant only for pod-based indexes.
   //
-  // The index fullness result may be inaccurate during pod resizing; to get the status of a pod resizing process, use [`describe_index`](https://docs.pinecone.io/reference/api/2024-07/control-plane/describe_index).
+  // The index fullness result may be inaccurate during pod resizing; to get the status of a pod resizing process, use [`describe_index`](https://docs.pinecone.io/reference/api/2024-10/control-plane/describe_index).
   float index_fullness = 3;
 
   // The total number of vectors in the index, regardless of whether a metadata filter expression was passed
