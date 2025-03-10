@@ -23,7 +23,7 @@ These files represent the Pinecone API services at specific points in time and a
   both REST and gRPC specifications. The relevant filenames will include "data", "control", "db_data", or "db_control" depending on the version.
 - **Inference**: The [Inference API](https://docs.pinecone.io/guides/inference/understanding-inference) provides access to embedding and reranking models hosted on Pinecone's infrastructure. The inference
   services support REST.
-- **Assistant**: The [Assistant API](https://docs.pinecone.io/guides/get-started/assistant-quickstart) facillitates uploading documents, asking questions, and receiving responses that reference your documents. The assistant services support REST.
+- **Assistant**: The [Assistant API](https://docs.pinecone.io/guides/assistant/overview) facillitates uploading documents, asking questions, and receiving responses that reference your documents. The assistant services support REST.
 
 Support for these services is dependent on which version of the Pinecone API you are working with. For example, inference is only available in version `2024-10` and later.
 Read more about [Pinecone API versioning](https://docs.pinecone.io/reference/api/versioning).
@@ -75,17 +75,18 @@ Refer to the tool documentation for usage instructions tailored to your preferre
 
 ## Versioned Specifications
 
-Each subdirectory in this repository represents a specific version of the Pinecone API. New versions of the Pinecone API are released quarterly.
-You can find more about API versioning [here](https://docs.pinecone.io/reference/api/versioning). Directories are named using the `YYYY-MM` format, corresponding to the year and month of the release.
+Specific versions of the Pinecone API are released using git tags and [releases](https://github.com/pinecone-io/pinecone-api/releases) in this repository. New versions of the Pinecone API are released quarterly. You can find more about API versioning [here](https://docs.pinecone.io/reference/api/versioning). Tags are named using the `YYYY-MM` format, corresponding to the year and month of the release.
 
-Example:
+Example ([tag](https://github.com/pinecone-io/pinecone-api/tree/2024-10): `2024-10`):
 
 ```
-2024-10/
-  - db_control_2024-10.oas.yaml
-  - db_data_2024-10.oas.yaml
-  - db_data_2024-10.proto
-  - inference_2024-10.oas.yaml
+pinecone-io/pinecone-api:2024-10/
+  - .gitignore
+  - README.md
+  - db_control.oas.yaml
+  - db_data.oas.yaml
+  - db_data.proto
+  - inference.oas.yaml
 ```
 
 - **OpenAPI Files**: Files with the extension `*.oas.yaml`.
@@ -99,14 +100,14 @@ The Pinecone API consists of multiple services. Below is a high-level breakdown 
 
 Note: The database service is split into "control" and "data" specifications. Control handles managing database resources such as indexes and collections and uses REST. Data defines interaction with a specific index resource and uses gRPC or REST.
 
-| Service                | OpenAPI File                                  | Protobuf File                 | Documentation Link                                                                           |
-| ---------------------- | --------------------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------- |
-| Database - Control     | `db_control_<API_VERSION>.oas.yaml`           | N/A                           | [Database Documentation](https://docs.pinecone.io/reference/api/introduction#database-api)   |
-| Database - Data        | `db_data_<API_VERSION>.oas.yaml`              | `db_data_<API_VERSION>.proto` | [Database Documentation](https://docs.pinecone.io/reference/api/introduction#database-api)   |
-| Inference              | `inference_<API_VERSION>.oas.yaml`            | N/A                           | [Inference Documentation](https://docs.pinecone.io/reference/api/introduction#inference-api) |
-| Assistant - Control    | `assistant_control_<API_VERSION>.oas.yaml`    | N/A                           | [Assistant Documentation](https://docs.pinecone.io/reference/api/introduction#assistant-api) |
-| Assistant - Data       | `assistant_data_<API_VERSION>.oas.yaml`       | N/A                           | [Assistant Documentation](https://docs.pinecone.io/reference/api/introduction#assistant-api) |
-| Assistant - Evaluation | `assistant_evaluation_<API_VERSION>.oas.yaml` | N/A                           | [Assistant Documentation](https://docs.pinecone.io/reference/api/introduction#assistant-api) |
+| Service                | OpenAPI File                    | Protobuf File   | Documentation Link                                                                           |
+| ---------------------- | ------------------------------- | --------------- | -------------------------------------------------------------------------------------------- |
+| Database - Control     | `db_control.oas.yaml`           | N/A             | [Database Documentation](https://docs.pinecone.io/reference/api/introduction#database-api)   |
+| Database - Data        | `db_data.oas.yaml`              | `db_data.proto` | [Database Documentation](https://docs.pinecone.io/reference/api/introduction#database-api)   |
+| Inference              | `inference.oas.yaml`            | N/A             | [Inference Documentation](https://docs.pinecone.io/reference/api/introduction#inference-api) |
+| Assistant - Control    | `assistant_control.oas.yaml`    | N/A             | [Assistant Documentation](https://docs.pinecone.io/reference/api/introduction#assistant-api) |
+| Assistant - Data       | `assistant_data.oas.yaml`       | N/A             | [Assistant Documentation](https://docs.pinecone.io/reference/api/introduction#assistant-api) |
+| Assistant - Evaluation | `assistant_evaluation.oas.yaml` | N/A             | [Assistant Documentation](https://docs.pinecone.io/reference/api/introduction#assistant-api) |
 
 You can find specific links and resources for each service in the [Pinecone API reference](https://docs.pinecone.io/reference/api/introduction). Note: The names of the files may differ across versions.
 
