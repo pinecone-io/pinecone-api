@@ -1,0 +1,373 @@
+openapi: 3.0.3
+info:
+  title: Pinecone Inference API
+  description: Pinecone is a vector database that makes it easy to search and retrieve billions of high-dimensional vectors.
+  contact:
+    name: Pinecone Support
+    url: https://support.pinecone.io
+    email: support@pinecone.io
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+  version: 2024-10
+servers:
+- url: https://api.pinecone.io
+  description: Production API endpoints
+paths:
+  /embed:
+    post:
+      tags:
+      - Inference
+      summary: Generate vectors
+      description: |-
+        Generate vector embeddings for input data. This endpoint uses [Pinecone Inference](https://docs.pinecone.io/guides/index-data/indexing-overview#vector-embedding).
+      operationId: embed
+      requestBody:
+        description: Generate embeddings for inputs.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmbedRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbeddingsList'
+        '400':
+          description: Bad request. The request body included invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                index-metric-validation-error:
+                  summary: Validation error
+                  value:
+                    error:
+                      code: INVALID_ARGUMENT
+                      message: Bad request. The request body included invalid request parameters.
+                    status: 400
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+  /rerank:
+    post:
+      tags:
+      - Inference
+      summary: Rerank results
+      description: |-
+        Rerank query results according to their relevance to a query. This endpoint uses [Pinecone Inference](https://docs.pinecone.io/guides/index-data/indexing-overview#vector-embedding).
+      operationId: rerank
+      requestBody:
+        description: Rerank documents for the given query
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                model:
+                  example: bge-reranker-v2-m3
+                  description: The [model](https://docs.pinecone.io/guides/search/rerank-results#reranking-models) to use for reranking.
+                  type: string
+                query:
+                  example: What is the capital of France?
+                  description: The query to rerank documents against.
+                  type: string
+                top_n:
+                  example: 5
+                  description: The number of results to return sorted by relevance. Defaults to the number of inputs.
+                  type: integer
+                return_documents:
+                  example: true
+                  description: Whether to return the documents in the response.
+                  default: true
+                  type: boolean
+                rank_fields:
+                  description: |
+                    The field(s) to consider for reranking. If not provided, the default is `["text"]`.
+
+                    The number of fields supported is [model-specific](https://docs.pinecone.io/guides/search/rerank-results#reranking-models).
+                  default:
+                  - text
+                  type: array
+                  items:
+                    type: string
+                documents:
+                  description: The documents to rerank.
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Document'
+                parameters:
+                  description: Additional model-specific parameters for the reranker.
+                  type: object
+                  additionalProperties:
+                    type: string
+              required:
+              - model
+              - documents
+              - query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RerankResult'
+        '400':
+          description: Bad request. The request body included invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                index-metric-validation-error:
+                  summary: Validation error
+                  value:
+                    error:
+                      code: INVALID_ARGUMENT
+                      message: Bad request. The request body included invalid request parameters.
+                    status: 400
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+components:
+  schemas:
+    EmbeddingsList:
+      description: Embeddings generated for the input
+      type: object
+      properties:
+        model:
+          example: multilingual-e5-large
+          description: The model used to generate the embeddings
+          type: string
+        data:
+          description: The embeddings generated for the inputs.
+          type: array
+          items:
+            $ref: '#/components/schemas/Embedding'
+        usage:
+          description: Usage statistics for the model inference.
+          type: object
+          properties:
+            total_tokens:
+              example: 205
+              description: Total number of tokens consumed across all inputs.
+              type: integer
+      required:
+      - model
+      - data
+      - usage
+    EmbedRequest:
+      type: object
+      properties:
+        model:
+          example: multilingual-e5-large
+          description: The [model](https://docs.pinecone.io/guides/index-data/create-an-index#embedding-models) to use for embedding generation.
+          type: string
+        parameters:
+          description: Model-specific parameters.
+          type: object
+          properties:
+            input_type:
+              example: query
+              description: Common property used to distinguish between types of data.
+              type: string
+            truncate:
+              example: END
+              description: "How to handle inputs longer than those supported by the model. If `\"END\"`, truncate the input sequence at the token limit. If `\"NONE\"`, return an error when the input exceeds the token limit. \n"
+              default: END
+              type: string
+        inputs:
+          description: List of inputs to generate embeddings for.
+          type: array
+          items:
+            type: object
+            properties:
+              text:
+                example: The quick brown fox jumps over the lazy dog.
+                type: string
+      required:
+      - model
+      - inputs
+    RankedDocument:
+      description: A ranked document with a relevance score and an index position.
+      type: object
+      properties:
+        index:
+          description: The index of the document
+          type: integer
+        score:
+          example: 0.5
+          description: 'The relevance of the document to the query, normalized between 0 and 1, with scores closer to 1 indicating higher relevance.'
+          type: number
+        document:
+          $ref: '#/components/schemas/Document'
+      required:
+      - index
+      - score
+    Document:
+      example:
+        id: '1'
+        text: Paris is the capital of France.
+        title: France
+        url: https://example.com
+      description: Document for reranking
+      type: object
+      additionalProperties:
+        type: string
+    ErrorResponse:
+      example:
+        error:
+          code: QUOTA_EXCEEDED
+          message: The index exceeds the project quota of 5 pods by 2 pods. Upgrade your account or change the project settings to increase the quota.
+        status: 429
+      description: The response shape used for all error responses.
+      type: object
+      properties:
+        status:
+          example: 500
+          description: The HTTP status code of the error.
+          type: integer
+        error:
+          example:
+            code: INVALID_ARGUMENT
+            message: Index name must contain only lowercase alphanumeric characters or hyphens, and must not begin or end with a hyphen.
+          description: Detailed information about the error that occurred.
+          type: object
+          properties:
+            code:
+              type: string
+              enum:
+              - OK
+              - UNKNOWN
+              - INVALID_ARGUMENT
+              - DEADLINE_EXCEEDED
+              - QUOTA_EXCEEDED
+              - NOT_FOUND
+              - ALREADY_EXISTS
+              - PERMISSION_DENIED
+              - UNAUTHENTICATED
+              - RESOURCE_EXHAUSTED
+              - FAILED_PRECONDITION
+              - ABORTED
+              - OUT_OF_RANGE
+              - UNIMPLEMENTED
+              - INTERNAL
+              - UNAVAILABLE
+              - DATA_LOSS
+              - FORBIDDEN
+            message:
+              example: Index name must contain only lowercase alphanumeric characters or hyphens, and must not begin or end with a hyphen.
+              type: string
+            details:
+              description: Additional information about the error. This field is not guaranteed to be present.
+              type: object
+          required:
+          - code
+          - message
+      required:
+      - status
+      - error
+    Embedding:
+      description: Embedding of a single input
+      type: object
+      properties:
+        values:
+          example:
+          - 0.1
+          - 0.2
+          - 0.3
+          description: The embedding values.
+          type: array
+          items:
+            type: number
+    RerankResult:
+      description: The result of a reranking request.
+      type: object
+      properties:
+        model:
+          example: bge-reranker-v2-m3
+          description: The model used to rerank documents.
+          type: string
+        data:
+          description: The reranked documents.
+          type: array
+          items:
+            $ref: '#/components/schemas/RankedDocument'
+        usage:
+          description: Usage statistics for the model inference.
+          type: object
+          properties:
+            rerank_units:
+              example: 1
+              type: integer
+      required:
+      - model
+      - data
+      - usage
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: Api-Key
+      description: An API Key is required to call Pinecone APIs. Get yours from the [console](https://app.pinecone.io/).
+security:
+- ApiKeyAuth: []
+tags:
+- name: Inference
+  description: Model inference
+externalDocs:
+  description: More Pinecone.io API docs
+  url: https://docs.pinecone.io/introduction

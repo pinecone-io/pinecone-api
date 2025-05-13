@@ -27,7 +27,7 @@ paths:
 
         By default, this returns up to 100 imports per page. If the `limit` parameter is set, `list` returns up to that number of imports instead. Whenever there are additional IDs to return, the response also includes a `pagination_token` that you can use to get the next batch of imports. When the response does not include a `pagination_token`, there are no more imports to return.
 
-        For guidance and examples, see [Import data](https://docs.pinecone.io/guides/data/import-data).
+        For guidance and examples, see [Import data](https://docs.pinecone.io/guides/index-data/import-data).
       operationId: listBulkImports
       parameters:
       - in: query
@@ -79,7 +79,7 @@ paths:
       description: |-
         Start an asynchronous import of vectors from object storage into an index.
 
-        For guidance and examples, see [Import data](https://docs.pinecone.io/guides/data/import-data).
+        For guidance and examples, see [Import data](https://docs.pinecone.io/guides/index-data/import-data).
       operationId: startBulkImport
       requestBody:
         content:
@@ -120,7 +120,7 @@ paths:
       description: |-
         Return details of a specific import operation.
 
-        For guidance and examples, see [Import data](https://docs.pinecone.io/guides/data/import-data).
+        For guidance and examples, see [Import data](https://docs.pinecone.io/guides/index-data/import-data).
       operationId: describeBulkImport
       parameters:
       - in: path
@@ -165,7 +165,7 @@ paths:
       description: |-
         Cancel an import operation if it is not yet finished. It has no effect if the operation is already finished.
 
-        For guidance and examples, see [Import data](https://docs.pinecone.io/guides/data/import-data).
+        For guidance and examples, see [Import data](https://docs.pinecone.io/guides/index-data/import-data).
       operationId: cancelBulkImport
       parameters:
       - in: path
@@ -252,7 +252,7 @@ paths:
       description: |-
         Search a namespace with a query vector or record ID and return the IDs of the most similar records, along with their similarity scores.
 
-        For guidance and examples, see [Query data](https://docs.pinecone.io/guides/data/query-data).
+        For guidance and examples, see [Search](https://docs.pinecone.io/guides/search/semantic-search).
       operationId: queryVectors
       requestBody:
         content:
@@ -293,7 +293,7 @@ paths:
       description: |-
         Delete vectors, by id, from a single namespace.
 
-        For guidance and examples, see [Delete data](https://docs.pinecone.io/guides/data/delete-data).
+        For guidance and examples, see [Delete data](https://docs.pinecone.io/guides/manage-data/delete-data).
       operationId: deleteVectors
       requestBody:
         content:
@@ -334,7 +334,7 @@ paths:
       description: |-
         Look up and return vectors, by ID, from a single namespace. The returned vectors include the vector data and/or metadata.
 
-        For guidance and examples, see [Fetch data](https://docs.pinecone.io/guides/data/fetch-data).
+        For guidance and examples, see [Fetch data](https://docs.pinecone.io/guides/manage-data/fetch-data).
       operationId: fetchVectors
       parameters:
       - in: query
@@ -387,7 +387,7 @@ paths:
 
         This returns up to 100 IDs at a time by default in sorted order (bitwise "C" collation). If the `limit` parameter is set, `list` returns up to that number of IDs instead. Whenever there are additional IDs to return, the response also includes a `pagination_token` that you can use to get the next batch of IDs. When the response does not include a `pagination_token`, there are no more IDs to return.
 
-        For guidance and examples, see [List record IDs](https://docs.pinecone.io/guides/data/list-record-ids).
+        For guidance and examples, see [List record IDs](https://docs.pinecone.io/guides/manage-data/list-record-ids).
 
         **Note:** `list` is supported only for serverless indexes.
       operationId: listVectors
@@ -450,7 +450,7 @@ paths:
       description: |-
         Update a vector in a namespace. If a value is included, it will overwrite the previous value. If a `set_metadata` is included, the values of the fields specified in it will be added or overwrite the previous value.
 
-        For guidance and examples, see [Update data](https://docs.pinecone.io/guides/data/update-data).
+        For guidance and examples, see [Update data](https://docs.pinecone.io/guides/manage-data/update-data).
       operationId: updateVector
       requestBody:
         content:
@@ -491,7 +491,7 @@ paths:
       description: |-
         Upsert vectors into a namespace. If a new value is upserted for an existing vector ID, it will overwrite the previous value.
 
-        For guidance and examples, see [Upsert data](https://docs.pinecone.io/guides/data/upsert-data#upsert-vectors).
+        For guidance and examples, see [Upsert data](https://docs.pinecone.io/guides/index-data/upsert-data#upsert-vectors).
       operationId: upsertVectors
       requestBody:
         content:
@@ -534,7 +534,7 @@ paths:
         
         Upserting text is supported only for [indexes with integrated embedding](https://docs.pinecone.io/reference/api/2025-01/control-plane/create_for_model).
 
-        For guidance and examples, see [Upsert data](https://docs.pinecone.io/guides/data/upsert-data#upsert-text).
+        For guidance and examples, see [Upsert data](https://docs.pinecone.io/guides/index-data/upsert-data#upsert-text).
       operationId: upsertRecordsNamespace
       parameters:
       - in: path
@@ -581,9 +581,9 @@ paths:
       description: |-
         Search a namespace with a query text, query vector, or record ID and return the most similar records, along with their similarity scores. Optionally, rerank the initial results based on their relevance to the query. 
 
-        Searching with text is supported only for [indexes with integrated embedding](https://docs.pinecone.io/guides/indexes/create-an-index#integrated-embedding). Searching with a query vector or record ID is supported for all indexes. 
+        Searching with text is supported only for indexes with [integrated embedding](https://docs.pinecone.io/guides/index-data/indexing-overview#vector-embedding). Searching with a query vector or record ID is supported for all indexes. 
 
-        For guidance and examples, see [Query data](https://docs.pinecone.io/guides/data/query-data).
+        For guidance and examples, see [Search](https://docs.pinecone.io/guides/search/semantic-search).
       operationId: searchRecordsNamespace
       parameters:
       - in: path
@@ -635,7 +635,7 @@ components:
           type: string
           maxLength: 1000
         uri:
-          description: The [URI prefix](https://docs.pinecone.io/guides/data/understanding-imports#directory-structure) under which the data to import is available. All data within this prefix will be listed then imported into the target index. Currently only `s3://` URIs are supported.
+          description: The [URI prefix](https://docs.pinecone.io/guides/index-data/import-data#prepare-your-data) under which the data to import is available. All data within this prefix will be listed then imported into the target index. Currently only `s3://` URIs are supported.
           type: string
           minLength: 1
           maxLength: 1500
@@ -747,7 +747,7 @@ components:
           type: string
         filter:
           description: |-
-            If specified, the metadata filter here will be used to select the vectors to delete. This is mutually exclusive with specifying ids to delete in the ids param or using delete_all=True. See [Understanding metadata](https://docs.pinecone.io/guides/data/understanding-metadata).
+            If specified, the metadata filter here will be used to select the vectors to delete. This is mutually exclusive with specifying ids to delete in the ids param or using delete_all=True. See [Understanding metadata](https://docs.pinecone.io/guides/index-data/indexing-overview#metadata).
             Serverless indexes do not support delete by metadata. Instead, you can use the `list` operation to fetch the vector IDs based on their common ID prefix and then delete the records by ID.
           type: object
     DeleteResponse:
@@ -759,7 +759,7 @@ components:
       properties:
         filter:
           description: |-
-            If this parameter is present, the operation only returns statistics for vectors that satisfy the filter. See [Understanding metadata](https://docs.pinecone.io/guides/data/understanding-metadata).
+            If this parameter is present, the operation only returns statistics for vectors that satisfy the filter. See [Understanding metadata](https://docs.pinecone.io/guides/index-data/indexing-overview#metadata).
 
             Serverless indexes do not support filtering `describe_index_stats` by metadata.
           type: object
@@ -906,7 +906,7 @@ components:
               - drama
             year:
               $eq: 2019
-          description: The filter to apply. You can use vector metadata to limit your search. See [Understanding metadata](https://docs.pinecone.io/guides/data/understanding-metadata). You can use vector metadata to limit your search. See [Understanding metadata](https://docs.pinecone.io/guides/data/understanding-metadata).
+          description: The filter to apply. You can use vector metadata to limit your search. See [Understanding metadata](https://docs.pinecone.io/guides/index-data/indexing-overview#metadata). You can use vector metadata to limit your search. See [Understanding metadata](https://docs.pinecone.io/guides/index-data/indexing-overview#metadata).
           type: object
         includeValues:
           example: true
@@ -1220,10 +1220,10 @@ components:
               type: integer
               format: int32
             filter:
-              description: The filter to apply. You can use vector metadata to limit your search. See [Understanding metadata](https://docs.pinecone.io/guides/data/understanding-metadata).
+              description: The filter to apply. You can use vector metadata to limit your search. See [Understanding metadata](https://docs.pinecone.io/guides/index-data/indexing-overview#metadata).
               type: object
             inputs:
-              description: The query text to search with. Searching with text is supported only for indexes with [integrated embedding](https://docs.pinecone.io/guides/indexes/create-an-index#integrated-embedding).
+              description: The query text to search with. Searching with text is supported only for indexes with [integrated embedding](https://docs.pinecone.io/guides/index-data/create-an-index#integrated-embedding).
               $ref: '#/components/schemas/EmbedInputs'
             vector:
               description: The query vector to search with.
@@ -1249,7 +1249,7 @@ components:
           properties:
             model:
               example: bge-reranker-v2-m3
-              description: The name of the [reranking model](https://docs.pinecone.io/guides/inference/understanding-inference#reranking-models) to use.
+              description: The name of the [reranking model](https://docs.pinecone.io/guides/search/rerank-results#reranking-models) to use.
               type: string
             rank_fields:
               example:
@@ -1258,7 +1258,7 @@ components:
               description: |
                 The field(s) to consider for reranking. If not provided, the default is `["text"]`.
 
-                The number of fields supported is [model-specific](https://docs.pinecone.io/guides/inference/understanding-inference#reranking-models).
+                The number of fields supported is [model-specific](https://docs.pinecone.io/guides/search/rerank-results#reranking-models).
               type: array
               items:
                 type: string
@@ -1270,7 +1270,7 @@ components:
             parameters:
               example:
                 truncate: END
-              description: Additional model-specific parameters. Refer to the [model guide](https://docs.pinecone.io/guides/inference/understanding-inference#reranking-models) for available model parameters.
+              description: Additional model-specific parameters. Refer to the [model guide](https://docs.pinecone.io/guides/search/rerank-results#reranking-models) for available model parameters.
               type: object
               additionalProperties: true
             query:

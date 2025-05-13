@@ -9,7 +9,7 @@ info:
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0
-  version: 2025-01
+  version: 2024-10
 servers:
 - url: https://api.pinecone.io
   description: Production API endpoints
@@ -47,7 +47,6 @@ paths:
                       status:
                         ready: true
                         state: Ready
-                      vector_type: dense
                     - dimension: 200
                       host: image-search-a31f9c1.svc.us-east1-gcp.pinecone.io
                       metric: dotproduct
@@ -59,18 +58,6 @@ paths:
                       status:
                         ready: false
                         state: Initializing
-                      vector_type: dense
-                    - host: sparse-index-1a2b3c4d.svc.us-east1-gcp.pinecone.io
-                      metric: dotproduct
-                      name: sparse-index
-                      spec:
-                        serverless:
-                          cloud: aws
-                          region: us-east-1
-                      status:
-                        ready: true
-                        state: Ready
-                      vector_type: sparse
                 one-index:
                   summary: A list containing one serverless index.
                   value:
@@ -86,7 +73,6 @@ paths:
                       status:
                         ready: false
                         state: Initializing
-                      vector_type: dense
                 no-indexes:
                   summary: No indexes created yet.
                   value:
@@ -123,7 +109,7 @@ paths:
       tags:
       - Manage Indexes
       summary: Create an index
-      description: "Create an index for vectors created with an external embedding model.\n\nFor guidance and examples, see [Create an index](https://docs.pinecone.io/guides/indexes/create-an-index#external-embedding)."
+      description: "Create an index for vectors created with an external embedding model.\n  \nFor guidance and examples, see [Create an index](https://docs.pinecone.io/guides/index-data/create-an-index).\n"
       operationId: create_index
       requestBody:
         description: The desired configuration for the index.
@@ -143,18 +129,6 @@ paths:
                     serverless:
                       cloud: gcp
                       region: us-east1
-                      source_collection: movie-embeddings
-              serverless-sparse-index:
-                summary: Creating a sparse serverless index
-                value:
-                  deletion_protection: enabled
-                  metric: dotproduct
-                  name: sparse-index
-                  spec:
-                    serverless:
-                      cloud: gcp
-                      region: us-east1
-                  vector_type: sparse
               pod-index:
                 summary: Creating a pod-based index
                 value:
@@ -191,11 +165,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               examples:
                 index-metric-validation-error:
-                  summary: Validation error
+                  summary: Validation error on metric.
                   value:
                     error:
                       code: INVALID_ARGUMENT
-                      message: Bad request. The request body included invalid request parameters.
+                      message: Metric must be cosine, euclidean, or dotproduct.
                     status: 400
         '401':
           description: 'Unauthorized. Possible causes: Invalid API key.'
@@ -333,7 +307,6 @@ paths:
                     status:
                       ready: false
                       state: Initializing
-                    vector_type: dense
                 movie-recommendations-pod:
                   summary: A pod-based index
                   value:
@@ -356,7 +329,6 @@ paths:
                     status:
                       ready: false
                       state: Initializing
-                    vector_type: dense
           links:
             UpsertVector:
               operationId: upsert
@@ -457,18 +429,18 @@ paths:
                       message: Invalid API key.
                     status: 401
         '403':
-          description: Forbidden. Deletion protection enabled.
+          description: 'Forbidden. Deletion protection enabled.'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               examples:
                 deletion-protection:
-                  summary: Forbidden
+                  summary: Deletion protection enabled
                   value:
                     error:
                       code: FORBIDDEN
-                      message: Deletion protection is enabled for this index. Disable deletion protection before retrying.
+                      message: 'Deletion protection is enabled for this index. Disable deletion protection before retrying.'
                     status: 403
         '404':
           description: Index not found.
@@ -516,7 +488,7 @@ paths:
       tags:
       - Manage Indexes
       summary: Configure an index
-      description: "Configure an existing index. \n\nFor serverless indexes, you can configure index deletion protection, tags, and integrated inference embedding settings for the index. For pod-based indexes, you can configure the pod size, number of replicas, tags, and index deletion protection.\n\nIt is not possible to change the pod type of a pod-based index. However, you can create a collection from a pod-based index and then [create a new pod-based index with a different pod type](http://docs.pinecone.io/guides/indexes/pods/create-a-pod-based-index#create-a-pod-index-from-a-collection) from the collection. For guidance and examples, see [Configure an index](http://docs.pinecone.io/guides/indexes/pods/manage-pod-based-indexes)."
+      description: "Configure an existing index. \n\nFor serverless indexes, you can configure only index deletion protection and tags. For pod-based indexes, you can configure the pod size, number of replicas, tags, and index deletion protection. \n\nIt is not possible to change the pod type of a pod-based index. However, you can create a collection from a pod-based index and then [create a new pod-based index with a different pod type](http://docs.pinecone.io/guides/indexes/pods/create-a-pod-based-index#create-a-pod-index-from-a-collection) from the collection. For guidance and examples, see [Configure an index](http://docs.pinecone.io/guides/indexes/pods/manage-pod-based-indexes)."
       operationId: configure_index
       parameters:
       - in: path
@@ -579,11 +551,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               examples:
                 index-metric-validation-error:
-                  summary: Validation error
+                  summary: Validation error on metric.
                   value:
                     error:
                       code: INVALID_ARGUMENT
-                      message: Bad request. The request body included invalid request parameters.
+                      message: Metric must be cosine, euclidean, or dotproduct.
                     status: 400
         '401':
           description: 'Unauthorized. Possible causes: Invalid API key.'
@@ -774,11 +746,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               examples:
                 index-metric-validation-error:
-                  summary: Validation error
+                  summary: Validation error on metric.
                   value:
                     error:
                       code: INVALID_ARGUMENT
-                      message: Bad request. The request body included invalid request parameters.
+                      message: Metric must be cosine, euclidean, or dotproduct.
                     status: 400
         '401':
           description: 'Unauthorized. Possible causes: Invalid API key.'
@@ -831,129 +803,6 @@ paths:
               examples:
                 collection-name-already-exists:
                   summary: Collection name needs to be unique.
-                  value:
-                    error:
-                      code: ALREADY_EXISTS
-                      message: Resource already exists.
-                    status: 409
-        '422':
-          description: Unprocessable entity. The request body could not be deserialized.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              examples:
-                missing-field:
-                  summary: Unprocessable entity
-                  value:
-                    error:
-                      code: UNPROCESSABLE_ENTITY
-                      message: 'Failed to deserialize the JSON body into the target type: missing field `metric` at line 1 column 16'
-                    status: 422
-        '500':
-          description: Internal server error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              examples:
-                internal-server-error:
-                  summary: Internal server error
-                  value:
-                    error:
-                      code: UNKNOWN
-                      message: Internal server error
-                    status: 500
-  /indexes/create-for-model:
-    post:
-      tags:
-      - Manage Indexes
-      summary: Create an index with integrated embedding
-      description: |-
-        Create an index with integrated embedding.
-
-        With this type of index, you provide source text, and Pinecone uses a [hosted embedding model](https://docs.pinecone.io/guides/inference/understanding-inference#embedding-models) to convert the text automatically during [upsert](https://docs.pinecone.io/reference/api/2025-01/data-plane/upsert_records) and [search](https://docs.pinecone.io/reference/api/2025-01/data-plane/search_records).
-
-        For guidance and examples, see [Create an index](https://docs.pinecone.io/guides/indexes/create-an-index#integrated-embedding).
-      operationId: create_index_for_model
-      requestBody:
-        description: The desired configuration for the index and associated embedding model.
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateIndexForModelRequest'
-            examples:
-              index-for-model:
-                summary: Creating a serverless index for the specified model
-                value:
-                  cloud: gcp
-                  deletion_protection: enabled
-                  embed:
-                    field_map:
-                      text: your-text-field
-                    metric: cosine
-                    model: multilingual-e5-large
-                  name: multilingual-e5-large-index
-                  region: us-east1
-        required: true
-      responses:
-        '201':
-          description: The index has successfully been created for the embedding model.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/IndexModel'
-        '400':
-          description: Bad request. The request body included invalid request parameters.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              examples:
-                index-metric-validation-error:
-                  summary: Validation error
-                  value:
-                    error:
-                      code: INVALID_ARGUMENT
-                      message: Bad request. The request body included invalid request parameters.
-                    status: 400
-        '401':
-          description: 'Unauthorized. Possible causes: Invalid API key.'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              examples:
-                unauthorized:
-                  summary: Unauthorized
-                  value:
-                    error:
-                      code: UNAUTHENTICATED
-                      message: Invalid API key.
-                    status: 401
-        '404':
-          description: Unknown cloud or region when creating a serverless index.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              examples:
-                serverless-spec-cloud-not-found:
-                  summary: Cannot create serverless index with invalid spec.
-                  value:
-                    error:
-                      code: NOT_FOUND
-                      message: 'Resource cloud: aws region: us-west1 not found.'
-                    status: 404
-        '409':
-          description: Index of given name already exists.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              examples:
-                index-name-already-exists:
-                  summary: Index name needs to be unique
                   value:
                     error:
                       code: ALREADY_EXISTS
@@ -1128,31 +977,51 @@ paths:
                     status: 500
 components:
   schemas:
-    ModelIndexEmbed:
-      example:
-        field_map:
-          text: your-text-field
-        metric: cosine
-        model: multilingual-e5-large
-        read_parameters:
-          input_type: query
-          truncate: NONE
-        write_parameters:
-          input_type: passage
-      description: The embedding model and document fields mapped to embedding inputs.
+    CollectionList:
+      description: The list of collections that exist in the project.
       type: object
       properties:
-        model:
-          example: multilingual-e5-large
-          description: The name of the embedding model used to create the index.
+        collections:
+          type: array
+          items:
+            $ref: '#/components/schemas/CollectionModel'
+    ConfigureIndexRequest:
+      description: Configuration used to scale an index.
+      type: object
+      properties:
+        spec:
+          type: object
+          properties:
+            pod:
+              type: object
+              properties:
+                replicas:
+                  description: The number of replicas. Replicas duplicate your index. They provide higher availability and throughput. Replicas can be scaled up or down as your needs change.
+                  default: 1
+                  type: integer
+                  format: int32
+                  minimum: 1
+                pod_type:
+                  description: The type of pod to use. One of `s1`, `p1`, or `p2` appended with `.` and one of `x1`, `x2`, `x4`, or `x8`.
+                  default: p1.x1
+                  type: string
+          required:
+          - pod
+        deletion_protection:
+          $ref: '#/components/schemas/DeletionProtection'
+        tags:
+          $ref: '#/components/schemas/IndexTags'
+    IndexModel:
+      description: The IndexModel describes the configuration and status of a Pinecone index.
+      type: object
+      properties:
+        name:
+          example: example-index
+          description: |
+            The name of the index. Resource name must be 1-45 characters long, start and end with an alphanumeric character, and consist only of lower case alphanumeric characters or '-'.
           type: string
-        metric:
-          description: The distance metric to be used for similarity search. You can use 'euclidean', 'cosine', or 'dotproduct'. If not specified, the metric will be defaulted according to the model. Cannot be updated once set.
-          type: string
-          enum:
-          - cosine
-          - euclidean
-          - dotproduct
+          minLength: 1
+          maxLength: 45
         dimension:
           example: 1536
           description: The dimensions of the vectors to be inserted in the index.
@@ -1160,23 +1029,130 @@ components:
           format: int32
           minimum: 1
           maximum: 20000
-        vector_type:
-          description: The index vector type. You can use 'dense' or 'sparse'. If 'dense', the vector dimension must be specified.  If 'sparse', the vector dimension should not be specified.
-          default: dense
+        metric:
+          description: The distance metric to be used for similarity search. You can use 'euclidean', 'cosine', or 'dotproduct'.
+          default: cosine
           type: string
-        field_map:
+          enum:
+          - cosine
+          - euclidean
+          - dotproduct
+        host:
+          example: semantic-search-c01b5b5.svc.us-west1-gcp.pinecone.io
+          description: The URL address where the index is hosted.
+          type: string
+        deletion_protection:
+          $ref: '#/components/schemas/DeletionProtection'
+        tags:
+          $ref: '#/components/schemas/IndexTags'
+        spec:
           example:
-            text: your-text-field
-          description: Identifies the name of the text field from your document model that is embedded.
+            pod:
+              environment: us-east-1-aws
+              metadata_config:
+                indexed:
+                - genre
+                - title
+                - imdb_rating
+              pod_type: p1.x1
+              pods: 1
+              replicas: 1
+              shards: 1
           type: object
-        read_parameters:
-          description: The read parameters for the embedding model.
+          properties:
+            pod:
+              $ref: '#/components/schemas/PodSpec'
+            serverless:
+              $ref: '#/components/schemas/ServerlessSpec'
+        status:
+          example:
+            ready: true
+            state: ScalingUpPodSize
           type: object
-        write_parameters:
-          description: The write parameters for the embedding model.
-          type: object
+          properties:
+            ready:
+              type: boolean
+            state:
+              type: string
+              enum:
+              - Initializing
+              - InitializationFailed
+              - ScalingUp
+              - ScalingDown
+              - ScalingUpPodSize
+              - ScalingDownPodSize
+              - Terminating
+              - Ready
+          required:
+          - ready
+          - state
       required:
-      - model
+      - name
+      - dimension
+      - metric
+      - status
+      - spec
+      - host
+    DeletionProtection:
+      description: |
+        Whether [deletion protection](http://docs.pinecone.io/guides/manage-data/manage-indexes#configure-deletion-protection) is enabled/disabled for the index.
+      default: disabled
+      type: string
+      enum:
+      - disabled
+      - enabled
+    IndexSpec:
+      description: |
+        The spec object defines how the index should be deployed.
+
+        For serverless indexes, you define only the [cloud and region](http://docs.pinecone.io/guides/index-data/create-an-index#cloud-regions) where the index should be hosted. For pod-based indexes, you define the [environment](http://docs.pinecone.io/guides/indexes/pods/understanding-pod-based-indexes#pod-environments) where the index should be hosted, the [pod type and size](http://docs.pinecone.io/guides/indexes/pods/understanding-pod-based-indexes#pod-types) to use, and other index characteristics.
+      type: object
+      properties:
+        serverless:
+          $ref: '#/components/schemas/ServerlessSpec'
+        pod:
+          $ref: '#/components/schemas/PodSpec'
+      additionalProperties: false
+      oneOf:
+      - required:
+        - serverless
+      - required:
+        - pod
+    ServerlessSpec:
+      description: Configuration needed to deploy a serverless index.
+      type: object
+      properties:
+        cloud:
+          example: aws
+          description: The public cloud where you would like your index hosted.
+          type: string
+          enum:
+          - gcp
+          - aws
+          - azure
+        region:
+          example: us-east-1
+          description: 'The region where you would like your index to be created. '
+          type: string
+      required:
+      - cloud
+      - region
+    IndexList:
+      description: The list of indexes that exist in the project.
+      type: object
+      properties:
+        indexes:
+          type: array
+          items:
+            $ref: '#/components/schemas/IndexModel'
+    IndexTags:
+      example:
+        tag0: val0
+        tag1: val1
+      description: Custom user tags added to an index. Keys must be 80 characters or less. Values must be 120 characters or less. Keys must be alphanumeric, '_', or '-'. Values must be alphanumeric, ';', '@', '_', '-', '.', '+', or ' '.  To unset a key, set the value to be an empty string.
+      type: object
+      additionalProperties:
+        type: string
     CollectionModel:
       description: The CollectionModel describes the configuration and status of a Pinecone collection.
       type: object
@@ -1218,183 +1194,23 @@ components:
       - name
       - status
       - environment
-    ConfigureIndexRequest:
-      description: Configuration used to scale an index.
-      type: object
-      properties:
-        spec:
-          type: object
-          properties:
-            pod:
-              type: object
-              properties:
-                replicas:
-                  description: The number of replicas. Replicas duplicate your index. They provide higher availability and throughput. Replicas can be scaled up or down as your needs change.
-                  default: 1
-                  type: integer
-                  format: int32
-                  minimum: 1
-                pod_type:
-                  description: The type of pod to use. One of `s1`, `p1`, or `p2` appended with `.` and one of `x1`, `x2`, `x4`, or `x8`.
-                  default: p1.x1
-                  type: string
-          required:
-          - pod
-        deletion_protection:
-          $ref: '#/components/schemas/DeletionProtection'
-        tags:
-          $ref: '#/components/schemas/IndexTags'
-        embed:
-          example:
-            field_map:
-              text: your-text-field
-            metric: cosine
-            model: multilingual-e5-large
-            read_parameters:
-              input_type: query
-              truncate: NONE
-            write_parameters:
-              input_type: passage
-          description: |-
-            Configure the integrated inference embedding settings for this index.
-
-            You can convert an existing index to an integrated index by specifying the embedding model and field_map. The index vector type and dimension must match the model vector type and dimension, and the index similarity metric must be supported by the model. Refer to the [model guide](https://docs.pinecone.io/guides/inference/understanding-inference#embedding-models) for available models and model details.
-
-            You can later change the embedding configuration to update the field map, read parameters, or write parameters. Once set, the model cannot be changed.
-          type: object
-          properties:
-            model:
-              example: multilingual-e5-large
-              description: The name of the embedding model to use with the index. The index dimension and model dimension must match, and the index similarity metric must be supported by the model. The index embedding model cannot be changed once set.
-              type: string
-            field_map:
-              example:
-                text: your-text-field
-              description: Identifies the name of the text field from your document model that will be embedded.
-              type: object
-            read_parameters:
-              description: The read parameters for the embedding model.
-              type: object
-            write_parameters:
-              description: The write parameters for the embedding model.
-              type: object
-    IndexSpec:
-      description: |
-        The spec object defines how the index should be deployed.
-
-        For serverless indexes, you define only the [cloud and region](http://docs.pinecone.io/guides/indexes/understanding-indexes#cloud-regions) where the index should be hosted. For pod-based indexes, you define the [environment](http://docs.pinecone.io/guides/indexes/pods/understanding-pod-based-indexes#pod-environments) where the index should be hosted, the [pod type and size](http://docs.pinecone.io/guides/indexes/pods/understanding-pod-based-indexes#pod-types) to use, and other index characteristics.
-      type: object
-      properties:
-        serverless:
-          $ref: '#/components/schemas/ServerlessSpec'
-        pod:
-          $ref: '#/components/schemas/PodSpec'
-      additionalProperties: false
-      oneOf:
-      - required:
-        - serverless
-      - required:
-        - pod
-    CollectionList:
-      description: The list of collections that exist in the project.
-      type: object
-      properties:
-        collections:
-          type: array
-          items:
-            $ref: '#/components/schemas/CollectionModel'
-    CreateIndexForModelRequest:
-      description: The desired configuration for the index and associated embedding model.
+    CreateCollectionRequest:
+      description: The configuration needed to create a Pinecone collection.
       type: object
       properties:
         name:
-          example: example-index
           description: |
-            The name of the index. Resource name must be 1-45 characters long, start and end with an alphanumeric character, and consist only of lower case alphanumeric characters or '-'.
+            The name of the collection to be created. Resource name must be 1-45 characters long, start and end with an alphanumeric character, and consist only of lower case alphanumeric characters or '-'.
           type: string
           minLength: 1
           maxLength: 45
-        cloud:
-          example: aws
-          description: The public cloud where you would like your index hosted.
+        source:
+          example: example-source-index
+          description: The name of the index to be used as the source for the collection.
           type: string
-          enum:
-          - gcp
-          - aws
-          - azure
-        region:
-          example: us-east-1
-          description: The region where you would like your index to be created.
-          type: string
-        deletion_protection:
-          $ref: '#/components/schemas/DeletionProtection'
-        tags:
-          $ref: '#/components/schemas/IndexTags'
-        embed:
-          example:
-            field_map:
-              text: your-text-field
-            metric: cosine
-            model: multilingual-e5-large
-            read_parameters:
-              input_type: query
-              truncate: NONE
-            write_parameters:
-              input_type: passage
-          description: |-
-            Specify the integrated inference embedding configuration for the index.
-
-            Once set the model cannot be changed, but you can later update the embedding configuration for an integrated inference index including field map, read parameters, or write parameters.
-
-            Refer to the [model guide](https://docs.pinecone.io/guides/inference/understanding-inference#embedding-models) for available models and model details.
-          type: object
-          properties:
-            model:
-              example: multilingual-e5-large
-              description: The name of the embedding model to use for the index.
-              type: string
-            metric:
-              description: The distance metric to be used for similarity search. You can use 'euclidean', 'cosine', or 'dotproduct'. If not specified, the metric will be defaulted according to the model. Cannot be updated once set.
-              type: string
-              enum:
-              - cosine
-              - euclidean
-              - dotproduct
-            field_map:
-              example:
-                text: your-text-field
-              description: Identifies the name of the text field from your document model that will be embedded.
-              type: object
-            read_parameters:
-              description: The read parameters for the embedding model.
-              type: object
-            write_parameters:
-              description: The write parameters for the embedding model.
-              type: object
-          required:
-          - model
-          - field_map
       required:
       - name
-      - cloud
-      - region
-      - embed
-    IndexList:
-      description: The list of indexes that exist in the project.
-      type: object
-      properties:
-        indexes:
-          type: array
-          items:
-            $ref: '#/components/schemas/IndexModel'
-    IndexTags:
-      example:
-        tag0: val0
-        tag1: val1
-      description: Custom user tags added to an index. Keys must be 80 characters or less. Values must be 120 characters or less. Keys must be alphanumeric, '_', or '-'.  Values must be alphanumeric, ';', '@', '_', '-', '.', '+', or ' '. To unset a key, set the value to be an empty string.
-      type: object
-      additionalProperties:
-        type: string
+      - source
     ErrorResponse:
       example:
         error:
@@ -1450,25 +1266,8 @@ components:
       required:
       - status
       - error
-    CreateCollectionRequest:
-      description: The configuration needed to create a Pinecone collection.
-      type: object
-      properties:
-        name:
-          description: |
-            The name of the collection to be created. Resource name must be 1-45 characters long, start and end with an alphanumeric character, and consist only of lower case alphanumeric characters or '-'.
-          type: string
-          minLength: 1
-          maxLength: 45
-        source:
-          example: example-source-index
-          description: The name of the index to be used as the source for the collection.
-          type: string
-      required:
-      - name
-      - source
-    IndexModel:
-      description: The IndexModel describes the configuration and status of a Pinecone index.
+    CreateIndexRequest:
+      description: The configuration needed to create a Pinecone index.
       type: object
       properties:
         name:
@@ -1486,82 +1285,23 @@ components:
           minimum: 1
           maximum: 20000
         metric:
-          description: The distance metric to be used for similarity search. You can use 'euclidean', 'cosine', or 'dotproduct'. If the 'vector_type' is 'sparse', the metric must be 'dotproduct'. If the `vector_type` is `dense`, the metric defaults to 'cosine'.
+          description: The distance metric to be used for similarity search. You can use 'euclidean', 'cosine', or 'dotproduct'.
+          default: cosine
           type: string
           enum:
           - cosine
           - euclidean
           - dotproduct
-        host:
-          example: semantic-search-c01b5b5.svc.us-west1-gcp.pinecone.io
-          description: The URL address where the index is hosted.
-          type: string
         deletion_protection:
           $ref: '#/components/schemas/DeletionProtection'
         tags:
           $ref: '#/components/schemas/IndexTags'
-        embed:
-          $ref: '#/components/schemas/ModelIndexEmbed'
         spec:
-          example:
-            pod:
-              environment: us-east-1-aws
-              metadata_config:
-                indexed:
-                - genre
-                - title
-                - imdb_rating
-              pod_type: p1.x1
-              pods: 1
-              replicas: 1
-              shards: 1
-          type: object
-          properties:
-            pod:
-              $ref: '#/components/schemas/PodSpec'
-            serverless:
-              $ref: '#/components/schemas/ServerlessSpec'
-        status:
-          example:
-            ready: true
-            state: ScalingUpPodSize
-          type: object
-          properties:
-            ready:
-              type: boolean
-            state:
-              type: string
-              enum:
-              - Initializing
-              - InitializationFailed
-              - ScalingUp
-              - ScalingDown
-              - ScalingUpPodSize
-              - ScalingDownPodSize
-              - Terminating
-              - Ready
-          required:
-          - ready
-          - state
-        vector_type:
-          description: The index vector type. You can use 'dense' or 'sparse'. If 'dense', the vector dimension must be specified.  If 'sparse', the vector dimension should not be specified.
-          default: dense
-          type: string
+          $ref: '#/components/schemas/IndexSpec'
       required:
       - name
-      - metric
-      - status
+      - dimension
       - spec
-      - host
-      - vector_type
-    DeletionProtection:
-      description: |
-        Whether [deletion protection](http://docs.pinecone.io/guides/indexes/manage-indexes#configure-deletion-protection) is enabled/disabled for the index.
-      default: disabled
-      type: string
-      enum:
-      - disabled
-      - enabled
     PodSpec:
       example:
         environment: us-east1-gcp
@@ -1625,63 +1365,6 @@ components:
       required:
       - environment
       - pod_type
-    ServerlessSpec:
-      description: Configuration needed to deploy a serverless index.
-      type: object
-      properties:
-        cloud:
-          example: aws
-          description: The public cloud where you would like your index hosted.
-          type: string
-          enum:
-          - gcp
-          - aws
-          - azure
-        region:
-          example: us-east-1
-          description: The region where you would like your index to be created.
-          type: string
-      required:
-      - cloud
-      - region
-    CreateIndexRequest:
-      description: The configuration needed to create a Pinecone index.
-      type: object
-      properties:
-        name:
-          example: example-index
-          description: |
-            The name of the index. Resource name must be 1-45 characters long, start and end with an alphanumeric character, and consist only of lower case alphanumeric characters or '-'.
-          type: string
-          minLength: 1
-          maxLength: 45
-        dimension:
-          example: 1536
-          description: The dimensions of the vectors to be inserted in the index.
-          type: integer
-          format: int32
-          minimum: 1
-          maximum: 20000
-        metric:
-          description: The distance metric to be used for similarity search. You can use 'euclidean', 'cosine', or 'dotproduct'. If the 'vector_type' is 'sparse', the metric must be 'dotproduct'. If the `vector_type` is `dense`, the metric defaults to 'cosine'.
-          type: string
-          enum:
-          - cosine
-          - euclidean
-          - dotproduct
-        deletion_protection:
-          $ref: '#/components/schemas/DeletionProtection'
-        tags:
-          $ref: '#/components/schemas/IndexTags'
-        spec:
-          $ref: '#/components/schemas/IndexSpec'
-        vector_type:
-          description: The index vector type. You can use 'dense' or 'sparse'. If 'dense', the vector dimension must be specified.  If 'sparse', the vector dimension should not be specified.
-          default: dense
-          type: string
-      required:
-      - name
-      - spec
   securitySchemes:
     ApiKeyAuth:
       type: apiKey

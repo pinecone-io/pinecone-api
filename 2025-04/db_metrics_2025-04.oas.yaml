@@ -1,0 +1,149 @@
+openapi: 3.0.3
+info:
+  title: Metrics API
+  description: Provides endpoints for accessing database metrics.
+  contact:
+    name: Pinecone Support
+    url: https://support.pinecone.io
+    email: support@pinecone.io
+  version: 2025-04
+servers:
+- url: https://api.pinecone.io
+  description: Production server
+paths:
+  /prometheus/project/{project_id}/metrics/discover:
+    get:
+      tags:
+      - Metrics
+      summary: Prometheus HTTP Service Discovery
+      description: Get endpoints for Prometheus scraping.
+      operationId: fetch_prometheus_targets
+      parameters:
+      - in: path
+        name: project_id
+        description: Project ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+        style: simple
+      responses:
+        '200':
+          description: A list of Prometheus scrape targets.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrometheusTargets'
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '429':
+          description: Too many requests. The client has sent too many requests in a given amount of time.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                too-many-requests:
+                  summary: Too many requests
+                  value:
+                    error:
+                      code: TOO_MANY_REQUESTS
+                      message: The client has sent too many requests in a given amount of time.
+                    status: 429
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+components:
+  schemas:
+    ErrorResponse:
+      example:
+        error:
+          code: TOO_MANY_REQUESTS
+          message: The client has sent too many requests in a given amount of time.
+        status: 429
+      description: The response shape used for all error responses.
+      type: object
+      properties:
+        status:
+          example: 500
+          description: The HTTP status code of the error.
+          type: integer
+        error:
+          example:
+            code: UNKNOWN
+            message: Internal Server Error
+          description: Detailed information about the error that occurred.
+          type: object
+          properties:
+            code:
+              type: string
+              enum:
+              - OK
+              - UNKNOWN
+              - UNAUTHENTICATED
+              - TOO_MANY_REQUESTS
+            message:
+              example: Index name must contain only lowercase alphanumeric characters or hyphens, and must not begin or end with a hyphen.
+              type: string
+            details:
+              description: Additional information about the error. This field is not guaranteed to be present.
+              type: object
+          required:
+          - code
+          - message
+      required:
+      - status
+      - error
+    PrometheusTargets:
+      description: The PrometheusTargets object describes the configuration needed to scrape metrics from a set of targets.
+      type: array
+      items:
+        type: object
+        properties:
+          targets:
+            example:
+            - https://us-west2-aws-adkl.svc.pinecone.io/projects/0ce9acea-7e07-4eb3-aa61-3a24f11e29aa/metrics/export
+            description: List of hostnames or IP addresses that are targets for monitoring.
+            type: array
+            items:
+              type: string
+          labels:
+            description: Set of labels to be attached to the scraped metrics from the targets.
+            type: object
+            additionalProperties:
+              type: string
+        required:
+        - targets
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: An API Key is required to call Pinecone APIs. Get yours from the [console](https://app.pinecone.io/).
+security:
+- BearerAuth: []
+tags:
+- name: Metrics
+  description: Endpoints for accessing database metrics.

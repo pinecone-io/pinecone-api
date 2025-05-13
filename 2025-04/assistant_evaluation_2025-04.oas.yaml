@@ -1,0 +1,205 @@
+openapi: 3.0.3
+info:
+  title: Evaluation API
+  description: Provides endpoints for evaluating RAG systems using various metrics.
+  contact:
+    name: Pinecone Support
+    url: https://support.pinecone.io
+    email: support@pinecone.io
+  version: 2025-04
+servers:
+- url: https://prod-1-data.ke.pinecone.io/assistant
+  description: Evaluation US Production API endpoints
+- url: https://prod-eu-data.ke.pinecone.io/assistant
+  description: Evaluation EU Production API endpoints
+paths:
+  /evaluation/metrics/alignment:
+    post:
+      tags:
+      - Metrics
+      summary: Evaluate an answer
+      description: |-
+        Evaluate the correctness and completeness of a response from an assistant or a RAG system. The correctness and completeness are evaluated based on the precision and recall of the generated answer with respect to the ground truth answer facts. Alignment is the harmonic mean of correctness and completeness.
+
+        For guidance and examples, see [Evaluate answers](https://docs.pinecone.io/guides/assistant/evaluate-answers).
+      operationId: metrics_alignment
+      requestBody:
+        description: The request body for the alignment evaluation.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlignmentRequest'
+        required: true
+      responses:
+        '200':
+          description: The evaluation metrics and reasoning for the generated answer.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlignmentResponse'
+        '422':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicErrorResponse'
+components:
+  schemas:
+    AlignmentRequest:
+      title: AlignmentRequest
+      description: The request for the alignment evaluation.
+      type: object
+      properties:
+        question:
+          example: What is the capital city of Spain?
+          title: Question
+          description: The question for which the answer was generated.
+          type: string
+        answer:
+          example: Barcelona.
+          title: Answer
+          description: The generated answer.
+          type: string
+        ground_truth_answer:
+          example: Madrid.
+          title: Ground Truth Answer
+          description: The ground truth answer to the question.
+          type: string
+      required:
+      - question
+      - answer
+      - ground_truth_answer
+      additionalProperties: false
+    AlignmentResponse:
+      title: AlignmentResponse
+      description: The response for the alignment evaluation.
+      type: object
+      properties:
+        metrics:
+          $ref: '#/components/schemas/Metrics'
+        reasoning:
+          $ref: '#/components/schemas/Reasoning'
+        usage:
+          $ref: '#/components/schemas/TokenCounts'
+      required:
+      - metrics
+      - reasoning
+      - usage
+      additionalProperties: false
+    BasicErrorResponse:
+      title: BasicErrorResponse
+      description: A basic error response that contains a message.
+      type: object
+      properties:
+        message:
+          title: Message
+          type: string
+      required:
+      - message
+    Entailment:
+      title: Entailment
+      description: The entailment of a fact.
+      type: string
+      enum:
+      - entailed
+      - contradicted
+      - neutral
+    EvaluatedFact:
+      title: EvaluatedFact
+      description: A fact that was evaluated.
+      type: object
+      properties:
+        fact:
+          $ref: '#/components/schemas/Fact'
+        entailment:
+          $ref: '#/components/schemas/Entailment'
+      required:
+      - fact
+      - entailment
+      additionalProperties: false
+    Fact:
+      title: Fact
+      description: A fact
+      type: object
+      properties:
+        content:
+          title: Content
+          description: The content of the fact.
+          type: string
+      required:
+      - content
+      additionalProperties: false
+    Metrics:
+      title: Metrics
+      description: The metrics returned for the alignment evaluation.
+      type: object
+      properties:
+        correctness:
+          title: Correctness
+          description: The precision of the generated answer.
+          type: number
+        completeness:
+          title: Completeness
+          description: The recall of the generated answer.
+          type: number
+        alignment:
+          title: Alignment
+          description: The harmonic mean of correctness and completeness.
+          type: number
+      required:
+      - correctness
+      - completeness
+      - alignment
+      additionalProperties: false
+    Reasoning:
+      title: Reasoning
+      description: The reasoning behind the alignment evaluation.
+      type: object
+      properties:
+        evaluated_facts:
+          title: Evaluated Facts
+          description: The facts that were evaluated.
+          type: array
+          items:
+            $ref: '#/components/schemas/EvaluatedFact'
+      required:
+      - evaluated_facts
+      additionalProperties: false
+    TokenCounts:
+      title: TokenCounts
+      description: Token counts for the input prompt and completion.
+      type: object
+      properties:
+        prompt_tokens:
+          title: Prompt Tokens
+          type: integer
+        completion_tokens:
+          title: Completion Tokens
+          type: integer
+        total_tokens:
+          title: Total Tokens
+          type: integer
+      required:
+      - prompt_tokens
+      - completion_tokens
+      - total_tokens
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: Api-Key
+      description: An API Key is required to call Pinecone APIs. Get yours from the [console](https://app.pinecone.io/).
+security:
+- ApiKeyAuth: []
+tags:
+- name: Metrics
+  description: Operations related to evaluation metrics calculation
+externalDocs:
+  description: More Pinecone.io API docs
+  url: https://docs.pinecone.io/introduction

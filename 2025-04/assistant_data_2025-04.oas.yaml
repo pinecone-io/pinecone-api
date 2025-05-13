@@ -1,0 +1,1012 @@
+openapi: 3.0.3
+info:
+  title: Pinecone Assistant Data Plane API
+  description: Pinecone Assistant Engine is a context engine to store and retrieve relevant knowledge from millions of documents at scale. This API supports interactions with assistants.
+  contact:
+    name: Pinecone Support
+    url: https://support.pinecone.io
+    email: support@pinecone.io
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+  version: 2025-04
+servers:
+- url: https://{assistant_host}
+  variables:
+    assistant_host:
+      default: unknown
+      description: host of the created assistant
+paths:
+  /files/{assistant_name}:
+    get:
+      tags:
+      - Manage Assistants
+      summary: List Files
+      description: |-
+        List all files in an assistant, with an option to filter files with metadata.
+
+        For guidance and examples, see [Manage files](https://docs.pinecone.io/guides/assistant/manage-files#list-files-in-an-assistant).
+      operationId: list_files
+      parameters:
+      - in: path
+        name: assistant_name
+        description: The name of the assistant to be described.
+        required: true
+        schema:
+          type: string
+        example: test-assistant
+        style: simple
+      - in: query
+        name: filter
+        description: Optional JSON-encoded metadata filter for files.
+        schema:
+          type: string
+          format: json
+        example: '{"genre":{"$eq":"comedy"}}'
+        style: form
+      responses:
+        '200':
+          description: This operation returns a list of all files that you have previously uploaded, and which are associated with the given assistant name.
+          content:
+            application/json:
+              schema:
+                description: The list of files that exist in the assistant
+                type: object
+                properties:
+                  files:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AssistantFileModel'
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '404':
+          description: Assistant not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                assistant-not-found:
+                  summary: Assistant not found.
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Assistant "example-assistant" not found.
+                    status: 404
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+    post:
+      tags:
+      - Manage Assistants
+      summary: Upload file to assistant
+      description: |-
+        Upload a file to the specified assistant.
+
+        For guidance and examples, see [Manage files](https://docs.pinecone.io/guides/assistant/manage-files#upload-a-local-file).
+      operationId: upload_file
+      parameters:
+      - in: path
+        name: assistant_name
+        description: The name of the assistant to upload files to.
+        required: true
+        schema:
+          type: string
+        example: test-model
+        style: simple
+      - in: query
+        name: metadata
+        description: Optional JSON-encoded metadata for files.
+        schema:
+          type: string
+          format: json
+        example: '{"genre":{"$eq":"comedy"}}'
+        style: form
+      requestBody:
+        description: The desired file to be uploaded and processed into the assistant.
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  description: The file to upload.
+                  type: string
+                  format: binary
+              required:
+              - file
+        required: true
+      responses:
+        '200':
+          description: File upload has been accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssistantFileModel'
+        '400':
+          description: Bad request. The request body included invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                files-validation-error:
+                  summary: Validation error on ingest.
+                  value:
+                    error:
+                      code: INVALID_ARGUMENT
+                      message: Uploaded file can only currently be either a pdf or txt file
+                    status: 400
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '404':
+          description: Assistant not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                assistant-not-found:
+                  summary: Assistant not found.
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Assistant "example-assistant" not found.
+                    status: 404
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+  /files/{assistant_name}/{assistant_file_id}:
+    get:
+      tags:
+      - Manage Assistants
+      summary: Describe a file upload
+      description: |-
+        Get the status and metadata of a file uploaded to an assistant.
+
+        For guidance and examples, see [Manage files](https://docs.pinecone.io/guides/assistant/manage-files#get-the-status-of-a-file).
+      operationId: describe_file
+      parameters:
+      - in: path
+        name: assistant_name
+        description: The name of the assistant to upload files to.
+        required: true
+        schema:
+          type: string
+        example: test-model
+        style: simple
+      - in: path
+        name: assistant_file_id
+        description: The uuid of the file to be described.
+        required: true
+        schema:
+          type: string
+        example: 72490b32-46d9-4db1-b48b-666e9176d9be
+        style: simple
+      - in: query
+        name: include_url
+        description: Include the signed URL of the file in the response.
+        schema:
+          type: string
+          enum:
+          - 'true'
+          - 'false'
+        style: form
+      responses:
+        '200':
+          description: Poll request successful.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssistantFileModel'
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '404':
+          description: File not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                file-not-found:
+                  summary: File not found.
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: File with id 72490b32-46d9-4db1-b48b-666e9176d9be  not found in provided assistant
+                    status: 404
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+    delete:
+      tags:
+      - Manage Assistants
+      summary: Delete an uploaded file
+      description: |-
+        Delete an uploaded file from an assistant.
+
+        For guidance and examples, see [Manage files](https://docs.pinecone.io/guides/assistant/manage-files#delete-a-file).
+      operationId: delete_file
+      parameters:
+      - in: path
+        name: assistant_name
+        description: The name of the assistant to upload files to.
+        required: true
+        schema:
+          type: string
+        example: test-model
+        style: simple
+      - in: path
+        name: assistant_file_id
+        description: The uuid of the file to be described.
+        required: true
+        schema:
+          type: string
+        example: 72490b32-46d9-4db1-b48b-666e9176d9be
+        style: simple
+      responses:
+        '200':
+          description: The request to delete the file has been accepted.
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '404':
+          description: File not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                file-not-found:
+                  summary: File not found.
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: File with id 72490b32-46d9-4db1-b48b-666e9176d9be  not found in provided assistant
+                    status: 404
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+  /chat/{assistant_name}/chat/completions:
+    post:
+      tags:
+      - Manage Assistants
+      summary: Chat through an OpenAI-compatible interface
+      description: "Chat with an assistant. This endpoint is based on the OpenAI Chat Completion API, a commonly used and adopted API. \n\nIt is useful if you need inline citations or OpenAI-compatible responses, but has limited functionality compared to the standard chat interface.\n\nFor guidance and examples, see [Chat with an assistant](https://docs.pinecone.io/guides/assistant/chat-with-assistant)."
+      operationId: chat_completion_assistant
+      parameters:
+      - in: path
+        name: assistant_name
+        description: The name of the assistant to be described.
+        required: true
+        schema:
+          type: string
+        example: test-assistant
+        style: simple
+      requestBody:
+        description: The desired configuration to chat an assistant.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchCompletions'
+        required: true
+      responses:
+        '200':
+          description: Search request successful.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatCompletionModel'
+            text/event-stream:
+              schema:
+                description: The ChatCompletionModel describes the response format of a chat request.
+                x-component-name: ChatCompletionModel
+                type: object
+                properties:
+                  id:
+                    type: string
+                  choices:
+                    type: array
+                    items:
+                      description: The ChoiceChunkModel describes a single choice in a chat completion response.
+                      x-component-name: ChoiceChunkModel
+                      type: object
+                      properties:
+                        finish_reason:
+                          type: string
+                          enum:
+                          - stop
+                          - length
+                          - content_filter
+                          - function_call
+                        index:
+                          type: integer
+                        delta:
+                          description: Chat completion message
+                          type: object
+                          properties:
+                            role:
+                              type: string
+                            content:
+                              type: string
+                  model:
+                    type: string
+        '400':
+          description: Bad request. The request body included invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                files-validation-error:
+                  summary: Validation error on ingest.
+                  value:
+                    error:
+                      code: INVALID_ARGUMENT
+                      message: Uploaded file can only currently be either a pdf or txt file
+                    status: 400
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '404':
+          description: Assistant not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                assistant-not-found:
+                  summary: Assistant not found.
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Assistant "example-assistant" not found.
+                    status: 404
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+  /chat/{assistant_name}:
+    post:
+      tags:
+      - Manage Assistants
+      summary: Chat with an assistant
+      description: "Chat with an assistant and get back citations in structured form. \n\nThis is the recommended way to chat with an assistant, as it offers more functionality and control over the assistant's responses and references than the OpenAI-compatible chat interface.\n\nFor guidance and examples, see [Chat with an assistant](https://docs.pinecone.io/guides/assistant/chat-with-assistant)."
+      operationId: chat_assistant
+      parameters:
+      - in: path
+        name: assistant_name
+        description: The name of the assistant to be described.
+        required: true
+        schema:
+          type: string
+        example: test-assistant
+        style: simple
+      requestBody:
+        description: The desired configuration to chat an assistant.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Chat'
+        required: true
+      responses:
+        '200':
+          description: Search request successful.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatModel'
+        '400':
+          description: Bad request. The request body included invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                files-validation-error:
+                  summary: Validation error on ingest.
+                  value:
+                    error:
+                      code: INVALID_ARGUMENT
+                      message: Uploaded file can only currently be either a pdf or txt file
+                    status: 400
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '404':
+          description: Assistant not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                assistant-not-found:
+                  summary: Assistant not found.
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Assistant "example-assistant" not found.
+                    status: 404
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+  /chat/{assistant_name}/context:
+    post:
+      tags:
+      - Manage Assistants
+      summary: Retrieve context from an assistant
+      description: |-
+        Retrieve context snippets from an assistant to use as part of RAG or any agentic flow.
+
+        For guidance and examples, see [Retrieve context snippets](https://docs.pinecone.io/guides/assistant/retrieve-context-snippets).
+      operationId: context_assistant
+      parameters:
+      - in: path
+        name: assistant_name
+        description: The name of the assistant to be described.
+        required: true
+        schema:
+          type: string
+        example: test-assistant
+        style: simple
+      requestBody:
+        description: The desired configuration to retrieve context from an assistant.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContextRequest'
+        required: true
+      responses:
+        '200':
+          description: Context retrieval process successful.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContextModel'
+        '400':
+          description: Bad request. The request body included invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                files-validation-error:
+                  summary: Validation error on ingest.
+                  value:
+                    error:
+                      code: INVALID_ARGUMENT
+                      message: Uploaded file can only currently be either a pdf or txt file
+                    status: 400
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '404':
+          description: Assistant not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                assistant-not-found:
+                  summary: Assistant not found.
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Assistant "example-assistant" not found.
+                    status: 404
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+components:
+  schemas:
+    ChatModel:
+      description: The ChatModel describes the response format of a chat request from the citation api.
+      type: object
+      properties:
+        id:
+          type: string
+        finish_reason:
+          type: string
+          enum:
+          - stop
+          - length
+          - content_filter
+          - function_call
+        message:
+          $ref: '#/components/schemas/MessageModel'
+        model:
+          type: string
+        citations:
+          type: array
+          items:
+            $ref: '#/components/schemas/CitationModel'
+        usage:
+          $ref: '#/components/schemas/UsageModel'
+    TypedReferenceModel:
+      description: The TypedReferenceModel represents a reference for the information provided.
+      discriminator:
+        propertyName: type
+      type: object
+    UsageModel:
+      description: The UsageModel describes the usage of a chat completion.
+      type: object
+      properties:
+        prompt_tokens:
+          type: integer
+        completion_tokens:
+          type: integer
+        total_tokens:
+          type: integer
+    ContextRequest:
+      description: Parameters to retrieve context from an assistant.
+      type: object
+      properties:
+        query:
+          description: The query that is used to generate the context. Exactly one of query or messages should be provided.
+          type: string
+        filter:
+          example:
+            genre:
+              $ne: documentary
+          description: Optionally filter which documents can be retrieved using the following metadata fields.
+          type: object
+        messages:
+          description: The list of messages to use for generating the context. Exactly one of query or messages should be provided.
+          type: array
+          items:
+            $ref: '#/components/schemas/MessageModel'
+        top_k:
+          example: 20
+          description: The maximum number of context snippets to return. Default is 16. Maximum is 64.
+          type: integer
+        snippet_size:
+          example: 4096
+          description: The maximum context snippet size. Default is 2048 tokens. Minimum is 512 tokens. Maximum is 8192 tokens.
+          type: integer
+    Chat:
+      description: The list of queries / chats to chat an assistant
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/MessageModel'
+        stream:
+          description: If false, the assistant will return a single JSON response. If true, the assistant will return a stream of responses.
+          default: 'false'
+          type: boolean
+        model:
+          description: The large language model to use for answer generation
+          default: gpt-4o
+          type: string
+          enum:
+          - gpt-4o
+          - claude-3-5-sonnet
+        filter:
+          example:
+            genre:
+              $ne: documentary
+          description: Optionally filter which documents can be retrieved using the following metadata fields.
+          type: object
+        json_response:
+          description: If true, the assistant will be instructed to return a JSON response. Cannot be used with streaming.
+          default: 'false'
+          type: boolean
+        include_highlights:
+          description: If true, the assistant will be instructed to return highlights from the referenced documents that support its response.
+          default: 'false'
+          type: boolean
+        context_options:
+          $ref: '#/components/schemas/ContextOptionsModel'
+      required:
+      - messages
+    SearchCompletions:
+      description: The list of queries / chats to chat an assistant
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/MessageModel'
+        stream:
+          description: If false, the assistant will return a single JSON response. If true, the assistant will return a stream of responses.
+          default: 'false'
+          type: boolean
+        model:
+          description: The large language model to use for answer generation
+          default: gpt-4o
+          type: string
+          enum:
+          - gpt-4o
+          - claude-3-5-sonnet
+        filter:
+          example:
+            genre:
+              $ne: documentary
+          description: Optionally filter which documents can be retrieved using the following metadata fields.
+          type: object
+      required:
+      - messages
+    ContextOptionsModel:
+      description: Controls the context snippets sent to the LLM.
+      type: object
+      properties:
+        top_k:
+          example: 20
+          description: The maximum number of context snippets to use. Default is 16. Maximum is 64.
+          type: integer
+        snippet_size:
+          example: 4096
+          description: The maximum context snippet size. Default is 2048 tokens. Minimum is 512 tokens. Maximum is 8192 tokens.
+          type: integer
+    CitationModel:
+      description: The CitationModel describes a single cited source returned by a chat request.
+      type: object
+      properties:
+        position:
+          description: The index position of the citation in the complete text response.
+          type: integer
+        references:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReferenceModel'
+    HighlightModel:
+      nullable: true
+      description: The HighlightModel represents a portion of a referenced document that directly supports or is relevant to the response.
+      type: object
+      properties:
+        type:
+          description: The type of the highlight. Currently it is always text.
+          type: string
+        content:
+          type: string
+      required:
+      - type
+      - content
+    ReferenceModel:
+      description: The ReferenceModel describes a single reference in a citation.
+      type: object
+      properties:
+        file:
+          $ref: '#/components/schemas/AssistantFileModel'
+        pages:
+          type: array
+          items:
+            type: integer
+        highlight:
+          $ref: '#/components/schemas/HighlightModel'
+    SnippetModel:
+      description: The SnippetModel represents a part of a document that is relevant to the user query.
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+          - text
+        content:
+          type: string
+        score:
+          type: number
+          format: float
+        reference:
+          $ref: '#/components/schemas/TypedReferenceModel'
+      required:
+      - content
+      - score
+      - reference
+    MessageModel:
+      description: The MessageModel describes the format of a message in a chat.
+      type: object
+      properties:
+        role:
+          description: Role of the message such as 'user' or 'assistant'
+          type: string
+        content:
+          description: Content of the message
+          type: string
+    ErrorResponse:
+      example:
+        error:
+          code: QUOTA_EXCEEDED
+          message: The index exceeds the project quota of 5 pods by 2 pods. Upgrade your account or change the project settings to increase the quota.
+        status: 429
+      description: The response shape used for all error responses.
+      type: object
+      properties:
+        status:
+          example: 500
+          description: The HTTP status code of the error.
+          type: integer
+        error:
+          example:
+            code: INVALID_ARGUMENT
+            message: Uploaded file can only currently be either a pdf or txt file
+          description: Detailed information about the error that occurred.
+          type: object
+          properties:
+            code:
+              type: string
+              enum:
+              - OK
+              - UNKNOWN
+              - INVALID_ARGUMENT
+              - DEADLINE_EXCEEDED
+              - QUOTA_EXCEEDED
+              - NOT_FOUND
+              - ALREADY_EXISTS
+              - PERMISSION_DENIED
+              - UNAUTHENTICATED
+              - RESOURCE_EXHAUSTED
+              - FAILED_PRECONDITION
+              - ABORTED
+              - OUT_OF_RANGE
+              - UNIMPLEMENTED
+              - INTERNAL
+              - UNAVAILABLE
+              - DATA_LOSS
+              - FORBIDDEN
+            message:
+              example: Index name must contain only lowercase alphanumeric characters or hyphens, and must not begin or end with a hyphen.
+              type: string
+            details:
+              description: Additional information about the error. This field is not guaranteed to be present.
+              type: object
+          required:
+          - code
+          - message
+      required:
+      - status
+      - error
+    ChatCompletionModel:
+      description: The ChatCompletionModel describes the response format of a chat request.
+      type: object
+      properties:
+        id:
+          type: string
+        choices:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChoiceModel'
+        model:
+          type: string
+        usage:
+          $ref: '#/components/schemas/UsageModel'
+    ContextModel:
+      description: The response format containing the context from an assistant.
+      type: object
+      properties:
+        id:
+          type: string
+        snippets:
+          type: array
+          items:
+            $ref: '#/components/schemas/SnippetModel'
+        usage:
+          $ref: '#/components/schemas/UsageModel'
+      required:
+      - snippets
+      - usage
+    ChoiceModel:
+      description: The ChoiceModel describes a single choice in a chat completion response
+      type: object
+      properties:
+        finish_reason:
+          type: string
+          enum:
+          - stop
+          - length
+          - content_filter
+          - function_call
+        index:
+          type: integer
+        message:
+          $ref: '#/components/schemas/MessageModel'
+    AssistantFileModel:
+      description: AssistantFileModel is the response format to a successful file upload request.
+      type: object
+      properties:
+        name:
+          type: string
+        id:
+          type: string
+          format: uuid
+        metadata:
+          nullable: true
+          type: object
+        created_on:
+          type: string
+          format: date-time
+        updated_on:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum:
+          - Processing
+          - Available
+          - Deleting
+          - ProcessingFailed
+        percent_done:
+          nullable: true
+          description: The percentage of the file that has been processed
+          type: number
+          format: double
+        signed_url:
+          nullable: true
+          example: https://storage.googleapis.com/bucket/file.pdf
+          description: A signed url that gives you access to the underlying file
+          type: string
+        error_message:
+          nullable: true
+          description: A message describing any error during file processing, provided only if an error occurs.
+          type: string
+      required:
+      - id
+      - name
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: Api-Key
+      description: Pinecone API Key
+security:
+- ApiKeyAuth: []
+tags:
+- name: Manage Assistants
+  description: Actions that manage Assistants

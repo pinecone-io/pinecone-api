@@ -1,0 +1,452 @@
+openapi: 3.0.3
+info:
+  title: Pinecone Assistant Control Plane API
+  description: 'Pinecone Assistant Engine is a context engine to store and retrieve relevant knowledge  from millions of documents at scale. This API supports creating and managing assistants. '
+  contact:
+    name: Pinecone Support
+    url: https://support.pinecone.io
+    email: support@pinecone.io
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+  version: 2025-04
+servers:
+- url: https://api.pinecone.io/assistant
+  description: Production API endpoints
+paths:
+  /assistants:
+    get:
+      tags:
+      - Manage Assistants
+      summary: List assistants
+      description: |-
+        List of all assistants in a project.
+
+        For guidance and examples, see [Manage assistants](https://docs.pinecone.io/guides/assistant/manage-assistants#list-assistants-for-a-project).
+      operationId: list_assistants
+      responses:
+        '200':
+          description: List all assistants in a project.
+          content:
+            application/json:
+              schema:
+                description: The list of assistants that exist in the project.
+                type: object
+                properties:
+                  assistants:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Assistant'
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+    post:
+      tags:
+      - Manage Assistants
+      summary: Create an assistant
+      description: |-
+        Create an assistant. This is where you specify the underlying training model, which cloud provider you would like to deploy with, and more.
+
+        For guidance and examples, see [Create an assistant](https://docs.pinecone.io/guides/assistant/create-assistant)
+      operationId: create_assistant
+      requestBody:
+        description: The desired configuration to create an assistant.
+        content:
+          application/json:
+            schema:
+              description: The configuration needed to create an assistant.
+              type: object
+              properties:
+                name:
+                  example: example-assistant
+                  description: |
+                    The name of the assistant. Resource name must be 1-45 characters long, start and end with an alphanumeric character, and consist only of lower case alphanumeric characters or '-'.
+                  type: string
+                  minLength: 1
+                  maxLength: 45
+                instructions:
+                  nullable: true
+                  description: Description or directive for the assistant to apply to all responses.
+                  type: string
+                metadata:
+                  type: object
+                region:
+                  description: The region to deploy the assistant in. Our current options are either us or eu. Defaults to us.
+                  type: string
+                  enum:
+                  - us
+                  - eu
+              required:
+              - name
+        required: true
+      responses:
+        '200':
+          description: Create request successful.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Assistant'
+        '400':
+          description: Bad request. The request body included invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                upload-validation-error:
+                  summary: Validation error on ingest
+                  value:
+                    error:
+                      code: INVALID_ARGUMENT
+                      message: Uploaded file can only currently be either a pdf or txt file
+                    status: 400
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+        '429':
+          description: Assistant of given name already exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /assistants/{assistant_name}:
+    get:
+      tags:
+      - Manage Assistants
+      summary: Check assistant status
+      description: |-
+        Get the status of an assistant.
+
+        For guidance and examples, see [Manage assistants](https://docs.pinecone.io/guides/assistant/manage-assistants#get-the-status-of-an-assistant)
+      operationId: get_assistant
+      parameters:
+      - in: path
+        name: assistant_name
+        description: The name of the assistant to get a status on.
+        required: true
+        schema:
+          type: string
+        example: test-model
+        style: simple
+      responses:
+        '200':
+          description: Poll request successful.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Assistant'
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '404':
+          description: Assistant not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                assistant-not-found:
+                  summary: Assistant not found.
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Assistant "example-assistant" not found.
+                    status: 404
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+    delete:
+      tags:
+      - Manage Assistants
+      summary: Delete an assistant
+      description: |-
+        Delete an existing assistant.
+
+        For guidance and examples, see [Manage assistants](https://docs.pinecone.io/guides/assistant/manage-assistants#delete-an-assistant)
+      operationId: delete_assistant
+      parameters:
+      - in: path
+        name: assistant_name
+        description: The name of the assistant to delete.
+        required: true
+        schema:
+          type: string
+        example: my-assistant
+        style: simple
+      responses:
+        '200':
+          description: The request to delete the assistant has been accepted.
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '404':
+          description: Assistant not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                assistant-not-found:
+                  summary: Assistant not found.
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Assistant "example-assistant" not found.
+                    status: 404
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+    patch:
+      tags:
+      - Manage Assistants
+      summary: Update an assistant
+      description: |-
+        Update an existing assistant. You can modify the assistant's instructions.
+
+        For guidance and examples, see [Manage assistants](https://docs.pinecone.io/guides/assistant/manage-assistants#add-instructions-to-an-assistant).
+      operationId: update_assistant
+      parameters:
+      - in: path
+        name: assistant_name
+        description: The name of the assistant to update.
+        required: true
+        schema:
+          type: string
+        style: simple
+      requestBody:
+        description: The desired configuration updates for the assistant.
+        content:
+          application/json:
+            schema:
+              description: The configuration updates for the assistant.
+              type: object
+              properties:
+                instructions:
+                  nullable: true
+                  description: Description or directive for the assistant to apply to all responses.
+                  type: string
+                metadata:
+                  nullable: true
+                  type: object
+        required: true
+      responses:
+        '200':
+          description: Update request successful.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  assistant_name:
+                    type: string
+                  instructions:
+                    description: Description or directive for the assistant to apply to all responses.
+                    type: string
+                  metadata:
+                    type: object
+        '400':
+          description: Bad Request
+        '401':
+          description: Unauthorized
+        '404':
+          description: Assistant not found
+        '500':
+          description: Internal Server Error
+components:
+  schemas:
+    Assistant:
+      description: The AssistantModel describes the configuration and status of a Pinecone Assistant.
+      type: object
+      properties:
+        name:
+          example: example-assistant
+          description: |
+            The name of the assistant. Resource name must be 1-45 characters long, start and end with an alphanumeric character, and consist only of lower case alphanumeric characters or '-'.
+          type: string
+          minLength: 1
+          maxLength: 45
+        instructions:
+          nullable: true
+          description: Description or directive for the assistant to apply to all responses.
+          type: string
+        metadata:
+          nullable: true
+          type: object
+        status:
+          type: string
+          enum:
+          - Initializing
+          - Failed
+          - Ready
+          - Terminating
+          - InitializationFailed
+        host:
+          description: The host where the assistant is deployed.
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - name
+      - status
+    ErrorResponse:
+      example:
+        error:
+          code: QUOTA_EXCEEDED
+          message: The index exceeds the project quota of 5 pods by 2 pods. Upgrade your account or change the project settings to increase the quota.
+        status: 429
+      description: The response shape used for all error responses.
+      type: object
+      properties:
+        status:
+          example: 500
+          description: The HTTP status code of the error.
+          type: integer
+        error:
+          example:
+            code: INVALID_ARGUMENT
+            message: Uploaded file can only currently be either a pdf or txt file
+          description: Detailed information about the error that occurred.
+          type: object
+          properties:
+            code:
+              type: string
+              enum:
+              - OK
+              - UNKNOWN
+              - INVALID_ARGUMENT
+              - DEADLINE_EXCEEDED
+              - QUOTA_EXCEEDED
+              - NOT_FOUND
+              - ALREADY_EXISTS
+              - PERMISSION_DENIED
+              - UNAUTHENTICATED
+              - RESOURCE_EXHAUSTED
+              - FAILED_PRECONDITION
+              - ABORTED
+              - OUT_OF_RANGE
+              - UNIMPLEMENTED
+              - INTERNAL
+              - UNAVAILABLE
+              - DATA_LOSS
+              - FORBIDDEN
+            message:
+              example: Index name must contain only lowercase alphanumeric characters or hyphens, and must not begin or end with a hyphen.
+              type: string
+            details:
+              description: Additional information about the error. This field is not guaranteed to be present.
+              type: object
+          required:
+          - code
+          - message
+      required:
+      - status
+      - error
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: Api-Key
+      description: Pinecone API Key
+security:
+- ApiKeyAuth: []
+tags:
+- name: Manage Assistants
+  description: Actions that manage Assistants
