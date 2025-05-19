@@ -155,9 +155,6 @@ paths:
         description: Filter models by type ('embed' or 'rerank').
         schema:
           type: string
-          enum:
-          - embed
-          - rerank
         example: embed
         style: form
       - in: query
@@ -165,9 +162,6 @@ paths:
         description: Filter embedding models by vector type ('dense' or 'sparse'). Only relevant when `type=embed`.
         schema:
           type: string
-          enum:
-          - dense
-          - sparse
         example: sparse
         style: form
       responses:
@@ -182,11 +176,15 @@ paths:
                   summary: Multiple available models.
                   value:
                     models:
-                    - batch_size: 96
-                      dimension: 768
+                    - max_batch_size: 96
+                      default_dimension: 256
                       modality: text
-                      name: example-embedding-model
-                      sequence_length: 512
+                      model: example-embedding-model
+                      max_sequence_length: 512
+                      provider_name: Embedding Model Provider
+                      supported_dimensions:
+                      - 256
+                      - 512
                       short_description: An example embedding model.
                       supported_metrics:
                       - cosine
@@ -216,10 +214,11 @@ paths:
                         value_type: integer
                       type: embed
                       vector_type: dense
-                    - batch_size: 100
+                    - max_batch_size: 100
                       modality: text
-                      name: example-reranking-model
-                      sequence_length: 1024
+                      model: example-reranking-model
+                      max_sequence_length: 1024
+                      provider_name: Reranking Model Provider
                       short_description: An example reranking model.
                       supported_parameters:
                       - default: true
@@ -297,11 +296,15 @@ paths:
                 embedding-model:
                   summary: An embedding model.
                   value:
-                    batch_size: 96
-                    dimension: 768
+                    max_batch_size: 96
+                    default_dimension: 256
                     modality: text
-                    name: example-embedding-model
-                    sequence_length: 512
+                    model: example-embedding-model
+                    max_sequence_length: 512
+                    provider_name: Embedding Model Provider
+                    supported_dimensions:
+                    - 256
+                    - 512
                     short_description: An example embedding model.
                     supported_metrics:
                     - cosine
@@ -334,10 +337,11 @@ paths:
                 rerank-model:
                   summary: A reranking model.
                   value:
-                    batch_size: 100
+                    max_batch_size: 100
                     modality: text
-                    name: example-reranking-model
-                    sequence_length: 1024
+                    model: example-reranking-model
+                    max_sequence_length: 1024
+                    provider_name: Reranking Model Provider
                     short_description: An example reranking model.
                     supported_parameters:
                     - default: true
@@ -647,15 +651,9 @@ components:
           example: embed
           description: The type of model (e.g. 'embed' or 'rerank').
           type: string
-          enum:
-          - embed
-          - rerank
         vector_type:
           description: Whether the embedding model produces 'dense' or 'sparse' embeddings.
           type: string
-          enum:
-          - dense
-          - sparse
         default_dimension:
           example: 1024
           description: The default embedding model dimension (applies to dense embedding models only).
@@ -780,9 +778,6 @@ components:
     VectorType:
       description: Indicates whether this is a 'dense' or 'sparse' embedding.
       type: string
-      enum:
-      - dense
-      - sparse
     SparseEmbedding:
       description: A sparse embedding of a single input
       type: object
