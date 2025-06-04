@@ -188,7 +188,7 @@ message QueryRequest {
     (google.api.field_behavior) = REQUIRED
   ];
 
-  // The filter to apply. You can use vector metadata to limit your search. See [Understanding metadata](https://docs.pinecone.io/guides/index-data/indexing-overview#metadata). You can use vector metadata to limit your search. See [Understanding metadata](https://docs.pinecone.io/guides/index-data/indexing-overview#metadata).
+  // The filter to apply. You can use vector metadata to limit your search. See [Understanding metadata](https://docs.pinecone.io/guides/index-data/indexing-overview#metadata).
   google.protobuf.Struct filter           = 3;
 
   // Indicates whether vector values are included in the response.

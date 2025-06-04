@@ -20,7 +20,7 @@ paths:
       - Inference
       summary: Generate vectors
       description: |-
-        Generate vector embeddings for input data. This endpoint uses [Pinecone Inference](https://docs.pinecone.io/guides/index-data/indexing-overview#vector-embedding).
+        Generate vector embeddings for input data. This endpoint uses Pinecone's [hosted embedding models](https://docs.pinecone.io/guides/index-data/create-an-index#embedding-models).
       operationId: embed
       requestBody:
         description: Generate embeddings for inputs.
@@ -83,7 +83,7 @@ paths:
       - Inference
       summary: Rerank documents
       description: |-
-        Rerank documents according to their relevance to a query.
+        Rerank results according to their relevance to a query.
 
         For guidance and examples, see [Rerank results](https://docs.pinecone.io/guides/search/rerank-results).
       operationId: rerank
@@ -146,8 +146,11 @@ paths:
     get:
       tags:
       - Inference
-      summary: Get available models.
-      description: Get available models.
+      summary: List available models
+      description: |-
+        List the embedding and reranking models hosted by Pinecone. 
+        
+        You can use hosted models as an integrated part of Pinecone operations or for standalone embedding and reranking. For more details, see [Vector embedding](https://docs.pinecone.io/guides/index-data/indexing-overview#vector-embedding) and [Rerank results](https://docs.pinecone.io/guides/search/rerank-results).
       operationId: list_models
       parameters:
       - in: query
@@ -273,8 +276,11 @@ paths:
     get:
       tags:
       - Inference
-      summary: Get available model details.
-      description: Get model details.
+      summary: Describe a model
+      description: |-
+        Get a description of a model hosted by Pinecone. 
+        
+        You can use hosted models as an integrated part of Pinecone operations or for standalone embedding and reranking. For more details, see [Vector embedding](https://docs.pinecone.io/guides/index-data/indexing-overview#vector-embedding) and [Rerank results](https://docs.pinecone.io/guides/search/rerank-results).
       operationId: get_model
       parameters:
       - in: path

@@ -550,8 +550,7 @@ components:
             year:
               $eq: 2019
           description: >-
-            The filter to apply. You can use vector metadata to limit your search. See [Understanding metadata](https://docs.pinecone.io/guides/index-data/indexing-overview#metadata). You can use vector metadata to limit your
-            search. See [Understanding metadata](https://docs.pinecone.io/guides/index-data/indexing-overview#metadata).
+            The filter to apply. You can use vector metadata to limit your search. See [Understanding metadata](https://docs.pinecone.io/guides/index-data/indexing-overview#metadata).
         includeValues:
           type: boolean
           example: true
