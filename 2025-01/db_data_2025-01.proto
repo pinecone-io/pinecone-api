@@ -66,7 +66,7 @@ message RequestUnion {
 
 // The request for the `upsert` operation.
 message UpsertRequest {
-  // An array containing the vectors to upsert. Recommended batch limit is 100 vectors.
+  // An array containing the vectors to upsert. Recommended batch limit is up to 1000 vectors.
   repeated Vector vectors   = 1 [
     (google.api.field_behavior) = REQUIRED
   ];
@@ -316,7 +316,7 @@ service VectorService {
   //
   // Writes vectors into a namespace. If a new value is upserted for an existing vector ID, it will overwrite the previous value.
   //
-  // For guidance and examples, see [Upsert data](https://docs.pinecone.io/guides/index-data/upsert-data).
+  // For guidance, examples, and limits, see [Upsert data](https://docs.pinecone.io/guides/index-data/upsert-data).
   rpc Upsert(UpsertRequest) returns (UpsertResponse) {
     option (google.api.http) = {
       post: "/vectors/upsert"
@@ -369,7 +369,7 @@ service VectorService {
   //
   // Searches a namespace, using a query vector. It retrieves the ids of the most similar items in a namespace, along with their similarity scores.
   //
-  // For guidance and examples, see [Search](https://docs.pinecone.io/guides/search/semantic-search).
+  // For guidance, examples, and limits, see [Search](https://docs.pinecone.io/guides/search/search-overview).
   rpc Query(QueryRequest) returns (QueryResponse) {
     option (google.api.http) = {
       post: "/query"

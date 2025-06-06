@@ -86,7 +86,7 @@ paths:
       description: |-
         Search a namespace with a query vector or record ID and return the IDs of the most similar records, along with their similarity scores.
 
-        For guidance and examples, see [Search](https://docs.pinecone.io/guides/search/semantic-search).
+        For guidance, examples, and limits, see [Search](https://docs.pinecone.io/guides/search/search-overview).
       operationId: query
       requestBody:
         content:
@@ -344,7 +344,7 @@ paths:
       description: |-
         The `upsert` operation writes vectors into a namespace. If a new value is upserted for an existing vector ID, it will overwrite the previous value.
 
-        For guidance and examples, see [Upsert data](https://docs.pinecone.io/guides/index-data/upsert-data).
+        For guidance, examples, and limits, see [Upsert data](https://docs.pinecone.io/guides/index-data/upsert-data).
       operationId: upsert
       requestBody:
         content:
@@ -804,7 +804,7 @@ components:
       type: object
       properties:
         vectors:
-          description: An array containing the vectors to upsert. Recommended batch limit is 100 vectors.
+          description: An array containing the vectors to upsert. Recommended batch limit is up to 1000 vectors.
           type: array
           required:
           - vectors
