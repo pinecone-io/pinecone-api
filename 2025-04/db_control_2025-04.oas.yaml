@@ -2428,6 +2428,10 @@ components:
           example: semantic-search-c01b5b5.svc.us-west1-gcp.pinecone.io
           description: The URL address where the index is hosted.
           type: string
+        private_host:
+          example: semantic-search-c01b5b5.svc.private.us-west1-gcp.pinecone.io
+          description: The private endpoint URL of an index.
+          type: string
         deletion_protection:
           $ref: '#/components/schemas/DeletionProtection'
         tags:

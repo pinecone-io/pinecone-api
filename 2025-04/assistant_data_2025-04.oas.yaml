@@ -737,7 +737,16 @@ components:
           type: string
           enum:
           - gpt-4o
+          - gpt-4.1
+          - o4-mini
           - claude-3-5-sonnet
+          - claude-3-7-sonnet
+          - gemini-2.5-pro
+        temperature:
+          description: 'Controls the randomness of the model''s output: lower values make responses more deterministic, while higher values increase creativity and variability. If the model does not support a temperature parameter, the parameter will be ignored.'
+          default: 0.0
+          type: number
+          format: float
         filter:
           example:
             genre:
@@ -774,7 +783,16 @@ components:
           type: string
           enum:
           - gpt-4o
+          - gpt-4.1
+          - o4-mini
           - claude-3-5-sonnet
+          - claude-3-7-sonnet
+          - gemini-2.5-pro
+        temperature:
+          description: 'Controls the randomness of the model''s output: lower values make responses more deterministic, while higher values increase creativity and variability. If the model does not support a temperature parameter, the parameter will be ignored.'
+          default: 0.0
+          type: number
+          format: float
         filter:
           example:
             genre:
