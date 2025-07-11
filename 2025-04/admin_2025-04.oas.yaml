@@ -436,7 +436,6 @@ paths:
         required: true
         schema:
           type: string
-          format: uuid
         style: simple
       responses:
         '200':
@@ -500,7 +499,6 @@ paths:
         required: true
         schema:
           type: string
-          format: uuid
         style: simple
       responses:
         '202':
@@ -565,7 +563,6 @@ paths:
         required: true
         schema:
           type: string
-          format: uuid
         style: simple
       requestBody:
         description: |
@@ -915,8 +912,188 @@ paths:
                       code: UNKNOWN
                       message: Internal server error
                     status: 500
+    patch:
+      tags:
+      - API Keys
+      summary: Update an API key
+      description: |
+        Update the name and roles of an API key.
+      operationId: update_api_key
+      parameters:
+      - in: path
+        name: api_key_id
+        description: API key ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+        style: simple
+      requestBody:
+        description: Updated name and roles for the API key.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAPIKeyRequest'
+        required: true
+      responses:
+        '201':
+          description: API key created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIKeyWithSecret'
+        '400':
+          description: Bad request. The request body included invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                index-metric-validation-error:
+                  summary: Validation error
+                  value:
+                    error:
+                      code: INVALID_ARGUMENT
+                      message: Bad request. The request body included invalid request parameters.
+                    status: 400
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        4XX:
+          description: Unexpected error on request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
 components:
   schemas:
+    Organization:
+      description: The details of an organization.
+      type: object
+      properties:
+        id:
+          description: The unique ID of the organization.
+          type: string
+        name:
+          description: The name of the organization.
+          type: string
+          minLength: 1
+          maxLength: 512
+        plan:
+          description: The current plan the organization is on.
+          x-enum:
+          - Free
+          - Standard
+          - Enterprise
+          - Dedicated
+          type: string
+        payment_status:
+          description: The current payment status of the organization.
+          x-enum:
+          - Active
+          - PaymentPending
+          - PastDue
+          - Restricted
+          - Suspended
+          - Deactivated
+          type: string
+        created_at:
+          description: The date and time when the organization was created.
+          type: string
+          format: date-time
+        support_tier:
+          description: The support tier of the organization.
+          x-enum:
+          - Free
+          - Developer
+          - Pro
+          - Enterprise
+          type: string
+      required:
+      - id
+      - name
+      - plan
+      - payment_status
+      - created_at
+      - support_tier
+    CreateProjectRequest:
+      type: object
+      properties:
+        name:
+          example: chatbot-prod
+          description: The name of the new project.
+          type: string
+          minLength: 1
+          maxLength: 512
+        max_pods:
+          description: |
+            The maximum number of Pods that can be created in the project. Default is `0` (serverless only).
+          type: integer
+        force_encryption_with_cmek:
+          description: |
+            Whether to force encryption with a customer-managed encryption key (CMEK). Default is `false`.
+          type: boolean
+      required:
+      - name
+    UpdateAPIKeyRequest:
+      type: object
+      properties:
+        name:
+          example: devkey
+          description: |
+            A new name for the API key. The name must be 1-80 characters long. If omitted, the name will not be updated.
+          type: string
+          minLength: 1
+          maxLength: 80
+        roles:
+          description: |
+            A new set of roles for the API key. Existing roles will be removed if not included.
+            If this field is omitted, the roles will not be updated.
+          type: array
+          items:
+            example: ProjectEditor
+            description: |-
+              A role that can be assigned to an API key.
+              Expected values include: - `ProjectEditor` - `ProjectViewer` - `ControlPlaneEditor` - `ControlPlaneViewer` - `DataPlaneEditor` - `DataPlaneViewer`
+            x-enum:
+            - ProjectEditor
+            - ProjectViewer
+            - ControlPlaneEditor
+            - ControlPlaneViewer
+            - DataPlaneEditor
+            - DataPlaneViewer
+            type: string
     APIKey:
       description: The details of an API key, without the secret.
       type: object
@@ -953,29 +1130,38 @@ components:
       - name
       - project_id
       - roles
-    APIKeyWithSecret:
-      description: |
-        The details of an API key, including the secret. Only returned on API key creation.
+    Project:
+      description: The details of a project.
       type: object
       properties:
-        key:
-          $ref: '#/components/schemas/APIKey'
-        value:
-          description: |
-            The value to use as an API key. New keys will have the format `"pckey_<public-label>_<unique-key>"`. The entire string should be used when authenticating.
+        id:
+          description: The unique ID of the project.
           type: string
-      required:
-      - key
-      - value
-    UpdateOrganizationRequest:
-      type: object
-      properties:
+          format: uuid
         name:
-          example: organization-name
-          description: The new name for the organization.
+          description: The name of the project.
           type: string
           minLength: 1
           maxLength: 512
+        max_pods:
+          description: The maximum number of Pods that can be created in the project.
+          type: integer
+        force_encryption_with_cmek:
+          description: Whether to force encryption with a customer-managed encryption key (CMEK).
+          type: boolean
+        organization_id:
+          description: The unique ID of the organization that the project belongs to.
+          type: string
+        created_at:
+          description: The date and time when the project was created.
+          type: string
+          format: date-time
+      required:
+      - id
+      - name
+      - max_pods
+      - force_encryption_with_cmek
+      - organization_id
     UpdateProjectRequest:
       type: object
       properties:
@@ -993,6 +1179,20 @@ components:
           description: |
             Whether to force encryption with a customer-managed encryption key (CMEK). Once enabled, CMEK encryption cannot be disabled.
           type: boolean
+    APIKeyWithSecret:
+      description: |
+        The details of an API key, including the secret. Only returned on API key creation.
+      type: object
+      properties:
+        key:
+          $ref: '#/components/schemas/APIKey'
+        value:
+          description: |
+            The value to use as an API key. New keys will have the format `"pckey_<public-label>_<unique-key>"`. The entire string should be used when authenticating.
+          type: string
+      required:
+      - key
+      - value
     CreateAPIKeyRequest:
       type: object
       properties:
@@ -1022,6 +1222,15 @@ components:
             type: string
       required:
       - name
+    UpdateOrganizationRequest:
+      type: object
+      properties:
+        name:
+          example: organization-name
+          description: The new name for the organization.
+          type: string
+          minLength: 1
+          maxLength: 512
     ErrorResponse:
       example:
         error:
@@ -1079,107 +1288,6 @@ components:
       required:
       - status
       - error
-    Organization:
-      description: The details of an organization.
-      type: object
-      properties:
-        id:
-          description: The unique ID of the organization.
-          type: string
-          format: uuid
-        name:
-          description: The name of the organization.
-          type: string
-          minLength: 1
-          maxLength: 512
-        plan:
-          description: The current plan the organization is on.
-          x-enum:
-          - Free
-          - Standard
-          - Enterprise
-          - Dedicated
-          type: string
-        payment_status:
-          description: The current payment status of the organization.
-          x-enum:
-          - Active
-          - PaymentPending
-          - PastDue
-          - Restricted
-          - Suspended
-          - Deactivated
-          type: string
-        created_at:
-          description: The date and time when the organization was created.
-          type: string
-          format: date-time
-        support_tier:
-          description: The support tier of the organization.
-          x-enum:
-          - Free
-          - Developer
-          - Pro
-          - Enterprise
-          type: string
-      required:
-      - id
-      - name
-      - plan
-      - payment_status
-      - created_at
-      - support_tier
-    Project:
-      description: The details of a project.
-      type: object
-      properties:
-        id:
-          description: The unique ID of the project.
-          type: string
-          format: uuid
-        name:
-          description: The name of the project.
-          type: string
-          minLength: 1
-          maxLength: 512
-        max_pods:
-          description: The maximum number of Pods that can be created in the project.
-          type: integer
-        force_encryption_with_cmek:
-          description: Whether to force encryption with a customer-managed encryption key (CMEK).
-          type: boolean
-        organization_id:
-          description: The unique ID of the organization that the project belongs to.
-          type: string
-        created_at:
-          description: The date and time when the project was created.
-          type: string
-          format: date-time
-      required:
-      - id
-      - name
-      - max_pods
-      - force_encryption_with_cmek
-      - organization_id
-    CreateProjectRequest:
-      type: object
-      properties:
-        name:
-          example: chatbot-prod
-          description: The name of the new project.
-          type: string
-          minLength: 1
-          maxLength: 512
-        max_pods:
-          description: |
-            The maximum number of Pods that can be created in the project. Default is `0` (serverless only).
-          type: integer
-        force_encryption_with_cmek:
-          description: |
-            Whether to force encryption with a customer-managed encryption key (CMEK). Default is `false`.
-          type: boolean
-      required:
-      - name
   securitySchemes:
     BearerAuth:
       type: http
