@@ -972,8 +972,8 @@ components:
           format: double
         signed_url:
           nullable: true
-          example: https://storage.googleapis.com/bucket/file.pdf
-          description: A signed url that gives you access to the underlying file
+          example: https://storage.googleapis.com/bucket/file.pdf?...
+          description: A [signed URL](https://cloud.google.com/storage/docs/access-control/signed-urls) that provides temporary, read-only access to the underlying file. Anyone with the link can access the file, so treat it as sensitive data. Expires after a short time.
           type: string
         error_message:
           nullable: true
