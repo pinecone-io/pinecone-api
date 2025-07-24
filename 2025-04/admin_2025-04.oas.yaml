@@ -1085,7 +1085,7 @@ components:
             example: ProjectEditor
             description: |-
               A role that can be assigned to an API key.
-              Expected values include: - `ProjectEditor` - `ProjectViewer` - `ControlPlaneEditor` - `ControlPlaneViewer` - `DataPlaneEditor` - `DataPlaneViewer`
+              Possible values: `ProjectEditor`, `ProjectViewer`, `ControlPlaneEditor`, `ControlPlaneViewer`, `DataPlaneEditor`, or `DataPlaneViewer`.
             x-enum:
             - ProjectEditor
             - ProjectViewer
@@ -1116,7 +1116,7 @@ components:
             example: ProjectEditor
             description: |-
               A role that can be assigned to an API key.
-              Expected values include: - `ProjectEditor` - `ProjectViewer` - `ControlPlaneEditor` - `ControlPlaneViewer` - `DataPlaneEditor` - `DataPlaneViewer`
+              Possible values: `ProjectEditor`, `ProjectViewer`, `ControlPlaneEditor`, `ControlPlaneViewer`, `DataPlaneEditor`, or `DataPlaneViewer`.
             x-enum:
             - ProjectEditor
             - ProjectViewer
@@ -1211,7 +1211,7 @@ components:
             example: ProjectEditor
             description: |-
               A role that can be assigned to an API key.
-              Expected values include: - `ProjectEditor` - `ProjectViewer` - `ControlPlaneEditor` - `ControlPlaneViewer` - `DataPlaneEditor` - `DataPlaneViewer`
+              Possible values: `ProjectEditor`, `ProjectViewer`, `ControlPlaneEditor`, `ControlPlaneViewer`, `DataPlaneEditor`, or `DataPlaneViewer`.
             x-enum:
             - ProjectEditor
             - ProjectViewer
@@ -1254,7 +1254,7 @@ components:
             code:
               description: |-
                 The error code.
-                Expected values include: - `OK` - `UNKNOWN` - `INVALID_ARGUMENT` - `DEADLINE_EXCEEDED` - `QUOTA_EXCEEDED` - `NOT_FOUND` - `ALREADY_EXISTS` - `PERMISSION_DENIED` - `UNAUTHENTICATED` - `RESOURCE_EXHAUSTED` - `FAILED_PRECONDITION` - `ABORTED` - `OUT_OF_RANGE` - `UNIMPLEMENTED` - `INTERNAL` - `UNAVAILABLE` - `DATA_LOSS` - `FORBIDDEN` - `UNPROCESSABLE_ENTITY`
+                Possible values: `OK`, `UNKNOWN`, `INVALID_ARGUMENT`, `DEADLINE_EXCEEDED`, `QUOTA_EXCEEDED`, `NOT_FOUND`, `ALREADY_EXISTS`, `PERMISSION_DENIED`, `UNAUTHENTICATED`, `RESOURCE_EXHAUSTED`, `FAILED_PRECONDITION`, `ABORTED`, `OUT_OF_RANGE`, `UNIMPLEMENTED`, `INTERNAL`, `UNAVAILABLE`, `DATA_LOSS`, `FORBIDDEN`, or `UNPROCESSABLE_ENTITY`.
               x-enum:
               - OK
               - UNKNOWN
