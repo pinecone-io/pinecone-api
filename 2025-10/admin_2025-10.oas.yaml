@@ -1,0 +1,1430 @@
+openapi: 3.0.3
+info:
+  title: Pinecone Admin API
+  description: |
+    Provides an API for managing a Pinecone organization and its resources.
+  contact:
+    name: Pinecone Support
+    url: https://support.pinecone.io
+    email: support@pinecone.io
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+  version: 2025-10
+servers:
+- url: https://api.pinecone.io
+  description: Production API endpoints
+paths:
+  /admin/projects:
+    get:
+      tags:
+      - Projects
+      summary: List projects
+      description: List all projects in an organization.
+      operationId: list_projects
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2025-10
+          type: string
+        style: simple
+      responses:
+        '200':
+          description: A list of projects.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectList'
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        4XX:
+          description: Unexpected error on request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+    post:
+      tags:
+      - Projects
+      summary: Create a new project
+      description: Creates a new project.
+      operationId: create_project
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2025-10
+          type: string
+        style: simple
+      requestBody:
+        description: The details of the new project.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProjectRequest'
+        required: true
+      responses:
+        '200':
+          description: The project was successfully created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '400':
+          description: Bad request. The request body included invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                index-metric-validation-error:
+                  summary: Validation error
+                  value:
+                    error:
+                      code: INVALID_ARGUMENT
+                      message: Bad request. The request body included invalid request parameters.
+                    status: 400
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        4XX:
+          description: Unexpected error on request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+  /admin/organizations:
+    get:
+      tags:
+      - Organizations
+      summary: List organizations
+      description: List all organizations associated with an account.
+      operationId: list_organizations
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2025-10
+          type: string
+        style: simple
+      responses:
+        '200':
+          description: A list of organizations.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationList'
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        4XX:
+          description: Unexpected error on request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+  /admin/projects/{project_id}:
+    get:
+      tags:
+      - Projects
+      summary: Get project details
+      description: Get details about a project.
+      operationId: fetch_project
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2025-10
+          type: string
+        style: simple
+      - in: path
+        name: project_id
+        description: Project ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+        style: simple
+      responses:
+        '200':
+          description: The details of a project.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        4XX:
+          description: Unexpected error on request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+    delete:
+      tags:
+      - Projects
+      summary: Delete a project
+      description: |
+        Delete a project and all its associated configuration.
+        Before deleting a project, you must delete all indexes, assistants, backups, and collections associated with the project. Other project resources, such as API keys, are automatically deleted when the project is deleted.
+      operationId: delete_project
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2025-10
+          type: string
+        style: simple
+      - in: path
+        name: project_id
+        description: Project ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+        style: simple
+      responses:
+        '202':
+          description: Project deletion request accepted.
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        4XX:
+          description: Unexpected error on request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+    patch:
+      tags:
+      - Projects
+      summary: Update a project
+      description: |
+        Update a project's configuration details.
+        You can update the project's name, maximum number of Pods, or enable encryption with a customer-managed encryption key (CMEK).
+      operationId: update_project
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2025-10
+          type: string
+        style: simple
+      - in: path
+        name: project_id
+        description: Project ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+        style: simple
+      requestBody:
+        description: |
+          Project details to be updated. Fields that are omitted will not be updated.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProjectRequest'
+        required: true
+      responses:
+        '200':
+          description: The project was successfully updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '400':
+          description: Bad request. The request body included invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                index-metric-validation-error:
+                  summary: Validation error
+                  value:
+                    error:
+                      code: INVALID_ARGUMENT
+                      message: Bad request. The request body included invalid request parameters.
+                    status: 400
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        4XX:
+          description: Unexpected error on request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+  /admin/organizations/{organization_id}:
+    get:
+      tags:
+      - Organizations
+      summary: Get organization details
+      description: Get details about an organization.
+      operationId: fetch_organization
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2025-10
+          type: string
+        style: simple
+      - in: path
+        name: organization_id
+        description: Organization ID
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        '200':
+          description: The details of an organization.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        4XX:
+          description: Unexpected error on request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+    delete:
+      tags:
+      - Organizations
+      summary: Delete an organization
+      description: |
+        Delete an organization and all its associated configuration.
+        Before deleting an organization, you must delete all projects (including indexes, assistants, backups, and collections) associated with the organization.
+      operationId: delete_organization
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2025-10
+          type: string
+        style: simple
+      - in: path
+        name: organization_id
+        description: Organization ID
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        '202':
+          description: Organization deletion request accepted.
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        4XX:
+          description: Unexpected error on request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+    patch:
+      tags:
+      - Organizations
+      summary: Update an organization
+      description: |
+        Update an organization's name.
+      operationId: update_organization
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2025-10
+          type: string
+        style: simple
+      - in: path
+        name: organization_id
+        description: Organization ID
+        required: true
+        schema:
+          type: string
+        style: simple
+      requestBody:
+        description: |
+          Organization details to be updated.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOrganizationRequest'
+        required: true
+      responses:
+        '200':
+          description: The organization was successfully updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+        '400':
+          description: Bad request. The request body included invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                index-metric-validation-error:
+                  summary: Validation error
+                  value:
+                    error:
+                      code: INVALID_ARGUMENT
+                      message: Bad request. The request body included invalid request parameters.
+                    status: 400
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        4XX:
+          description: Unexpected error on request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+  /admin/projects/{project_id}/api-keys:
+    get:
+      tags:
+      - API Keys
+      summary: List API keys
+      description: List all API keys in a project.
+      operationId: list_api_keys
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2025-10
+          type: string
+        style: simple
+      - in: path
+        name: project_id
+        description: Project ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+        style: simple
+      responses:
+        '200':
+          description: A list of API keys.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListApiKeysResponse'
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        4XX:
+          description: Unexpected error on request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+    post:
+      tags:
+      - API Keys
+      summary: Create an API key
+      description: |
+        Create a new API key for a project. Developers can use the API key to authenticate requests to Pinecone's Data Plane and Control Plane APIs.
+      operationId: create_api_key
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2025-10
+          type: string
+        style: simple
+      - in: path
+        name: project_id
+        description: Project ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+        style: simple
+      requestBody:
+        description: The details of the new API key.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAPIKeyRequest'
+        required: true
+      responses:
+        '201':
+          description: API key created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIKeyWithSecret'
+        '400':
+          description: Bad request. The request body included invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                index-metric-validation-error:
+                  summary: Validation error
+                  value:
+                    error:
+                      code: INVALID_ARGUMENT
+                      message: Bad request. The request body included invalid request parameters.
+                    status: 400
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '403':
+          description: Not enough available quota to complete this operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        4XX:
+          description: Unexpected error on request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+  /admin/api-keys/{api_key_id}:
+    get:
+      tags:
+      - API Keys
+      summary: Get API key details
+      description: Get the details of an API key, excluding the API key secret.
+      operationId: fetch_api_key
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2025-10
+          type: string
+        style: simple
+      - in: path
+        name: api_key_id
+        description: API key ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+        style: simple
+      responses:
+        '200':
+          description: The details of the API key, excluding the API key secret.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIKey'
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        4XX:
+          description: Unexpected error on request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+    delete:
+      tags:
+      - API Keys
+      summary: Delete an API key
+      description: Delete an API key from a project.
+      operationId: delete_api_key
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2025-10
+          type: string
+        style: simple
+      - in: path
+        name: api_key_id
+        description: API key ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+        style: simple
+      responses:
+        '202':
+          description: API key deletion request accepted.
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        4XX:
+          description: Unexpected error on request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+    patch:
+      tags:
+      - API Keys
+      summary: Update an API key
+      description: |
+        Update the name and roles of an API key.
+      operationId: update_api_key
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2025-10
+          type: string
+        style: simple
+      - in: path
+        name: api_key_id
+        description: API key ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+        style: simple
+      requestBody:
+        description: Updated name and roles for the API key.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAPIKeyRequest'
+        required: true
+      responses:
+        '200':
+          description: API key updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIKey'
+        '400':
+          description: Bad request. The request body included invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                index-metric-validation-error:
+                  summary: Validation error
+                  value:
+                    error:
+                      code: INVALID_ARGUMENT
+                      message: Bad request. The request body included invalid request parameters.
+                    status: 400
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        4XX:
+          description: Unexpected error on request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+components:
+  schemas:
+    UpdateProjectRequest:
+      type: object
+      properties:
+        name:
+          example: chatbot-prod
+          description: The name of the new project.
+          type: string
+          minLength: 1
+          maxLength: 512
+        max_pods:
+          description: |
+            The maximum number of Pods that can be created in the project.
+          type: integer
+        force_encryption_with_cmek:
+          description: |
+            Whether to force encryption with a customer-managed encryption key (CMEK). Once enabled, CMEK encryption cannot be disabled.
+          type: boolean
+    UpdateOrganizationRequest:
+      type: object
+      properties:
+        name:
+          example: organization-name
+          description: The new name for the organization.
+          type: string
+          minLength: 1
+          maxLength: 512
+    OrganizationList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Organization'
+      required:
+      - data
+    CreateProjectRequest:
+      type: object
+      properties:
+        name:
+          example: chatbot-prod
+          description: The name of the new project.
+          type: string
+          minLength: 1
+          maxLength: 512
+        max_pods:
+          description: |
+            The maximum number of Pods that can be created in the project. Default is `0` (serverless only).
+          type: integer
+        force_encryption_with_cmek:
+          description: |
+            Whether to force encryption with a customer-managed encryption key (CMEK). Default is `false`.
+          type: boolean
+      required:
+      - name
+    Project:
+      description: The details of a project.
+      type: object
+      properties:
+        id:
+          description: The unique ID of the project.
+          type: string
+          format: uuid
+        name:
+          description: The name of the project.
+          type: string
+          minLength: 1
+          maxLength: 512
+        max_pods:
+          description: The maximum number of Pods that can be created in the project.
+          type: integer
+        force_encryption_with_cmek:
+          description: Whether to force encryption with a customer-managed encryption key (CMEK).
+          type: boolean
+        organization_id:
+          description: The unique ID of the organization that the project belongs to.
+          type: string
+        created_at:
+          description: The date and time when the project was created.
+          type: string
+          format: date-time
+      required:
+      - id
+      - name
+      - max_pods
+      - force_encryption_with_cmek
+      - organization_id
+    APIKeyWithSecret:
+      description: |
+        The details of an API key, including the secret. Only returned on API key creation.
+      type: object
+      properties:
+        key:
+          $ref: '#/components/schemas/APIKey'
+        value:
+          description: |
+            The value to use as an API key. New keys will have the format `"pckey_<public-label>_<unique-key>"`. The entire string should be used when authenticating.
+          type: string
+      required:
+      - key
+      - value
+    ListApiKeysResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/APIKey'
+      required:
+      - data
+    UpdateAPIKeyRequest:
+      type: object
+      properties:
+        name:
+          example: devkey
+          description: |
+            A new name for the API key. The name must be 1-80 characters long. If omitted, the name will not be updated.
+          type: string
+          minLength: 1
+          maxLength: 80
+        roles:
+          description: |
+            A new set of roles for the API key. Existing roles will be removed if not included.
+            If this field is omitted, the roles will not be updated.
+          type: array
+          items:
+            example: ProjectEditor
+            description: |-
+              A role that can be assigned to an API key.
+              Possible values: `ProjectEditor`, `ProjectViewer`, `ControlPlaneEditor`, `ControlPlaneViewer`, `DataPlaneEditor`, or `DataPlaneViewer`.
+            x-enum:
+            - ProjectEditor
+            - ProjectViewer
+            - ControlPlaneEditor
+            - ControlPlaneViewer
+            - DataPlaneEditor
+            - DataPlaneViewer
+            type: string
+    ProjectList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Project'
+      required:
+      - data
+    APIKey:
+      description: The details of an API key, without the secret.
+      type: object
+      properties:
+        id:
+          description: The unique ID of the API key.
+          type: string
+          format: uuid
+        name:
+          description: The name of the API key.
+          type: string
+        project_id:
+          description: The ID of the project containing the API key.
+          type: string
+          format: uuid
+        roles:
+          description: The roles assigned to the API key.
+          type: array
+          items:
+            example: ProjectEditor
+            description: |-
+              A role that can be assigned to an API key.
+              Possible values: `ProjectEditor`, `ProjectViewer`, `ControlPlaneEditor`, `ControlPlaneViewer`, `DataPlaneEditor`, or `DataPlaneViewer`.
+            x-enum:
+            - ProjectEditor
+            - ProjectViewer
+            - ControlPlaneEditor
+            - ControlPlaneViewer
+            - DataPlaneEditor
+            - DataPlaneViewer
+            type: string
+      required:
+      - id
+      - name
+      - project_id
+      - roles
+    CreateAPIKeyRequest:
+      type: object
+      properties:
+        name:
+          example: devkey
+          description: |
+            The name of the API key. The name must be 1-80 characters long.
+          type: string
+          minLength: 1
+          maxLength: 80
+        roles:
+          description: |
+            The roles to create the API key with. Default is `["ProjectEditor"]`.
+          type: array
+          items:
+            example: ProjectEditor
+            description: |-
+              A role that can be assigned to an API key.
+              Possible values: `ProjectEditor`, `ProjectViewer`, `ControlPlaneEditor`, `ControlPlaneViewer`, `DataPlaneEditor`, or `DataPlaneViewer`.
+            x-enum:
+            - ProjectEditor
+            - ProjectViewer
+            - ControlPlaneEditor
+            - ControlPlaneViewer
+            - DataPlaneEditor
+            - DataPlaneViewer
+            type: string
+      required:
+      - name
+    ErrorResponse:
+      example:
+        error:
+          code: QUOTA_EXCEEDED
+          message: The index exceeds the project quota of 5 pods by 2 pods. Upgrade your account or change the project settings to increase the quota.
+        status: 429
+      description: The response shape used for all error responses.
+      type: object
+      properties:
+        status:
+          example: 500
+          description: The HTTP status code of the error.
+          type: integer
+        error:
+          example:
+            code: INVALID_ARGUMENT
+            message: Index name must contain only lowercase alphanumeric characters or hyphens, and must not begin or end with a hyphen.
+          description: Detailed information about the error that occurred.
+          type: object
+          properties:
+            code:
+              description: "The error code.\nPossible values: `OK`, `UNKNOWN`, `INVALID_ARGUMENT`, `DEADLINE_EXCEEDED`, `QUOTA_EXCEEDED`, `NOT_FOUND`, `ALREADY_EXISTS`, `PERMISSION_DENIED`, `UNAUTHENTICATED`, `RESOURCE_EXHAUSTED`, `FAILED_PRECONDITION`, `ABORTED`, `OUT_OF_RANGE`, `UNIMPLEMENTED`, `INTERNAL`, `UNAVAILABLE`, `DATA_LOSS`, `FORBIDDEN`, or `UNPROCESSABLE_ENTITY`.        "
+              x-enum:
+              - OK
+              - UNKNOWN
+              - INVALID_ARGUMENT
+              - DEADLINE_EXCEEDED
+              - QUOTA_EXCEEDED
+              - NOT_FOUND
+              - ALREADY_EXISTS
+              - PERMISSION_DENIED
+              - UNAUTHENTICATED
+              - RESOURCE_EXHAUSTED
+              - FAILED_PRECONDITION
+              - ABORTED
+              - OUT_OF_RANGE
+              - UNIMPLEMENTED
+              - INTERNAL
+              - UNAVAILABLE
+              - DATA_LOSS
+              - FORBIDDEN
+              - UNPROCESSABLE_ENTITY
+              type: string
+            message:
+              example: Index name must contain only lowercase alphanumeric characters or hyphens, and must not begin or end with a hyphen.
+              type: string
+            details:
+              description: Additional information about the error. This field is not guaranteed to be present.
+              type: object
+          required:
+          - code
+          - message
+      required:
+      - status
+      - error
+    Organization:
+      description: The details of an organization.
+      type: object
+      properties:
+        id:
+          description: The unique ID of the organization.
+          type: string
+        name:
+          description: The name of the organization.
+          type: string
+          minLength: 1
+          maxLength: 512
+        plan:
+          description: The current plan the organization is on.
+          x-enum:
+          - Free
+          - Standard
+          - Enterprise
+          - Dedicated
+          type: string
+        payment_status:
+          description: The current payment status of the organization.
+          x-enum:
+          - Active
+          - PaymentPending
+          - PastDue
+          - Restricted
+          - Suspended
+          - Deactivated
+          type: string
+        created_at:
+          description: The date and time when the organization was created.
+          type: string
+          format: date-time
+        support_tier:
+          description: The support tier of the organization.
+          x-enum:
+          - Free
+          - Developer
+          - Pro
+          - Enterprise
+          type: string
+      required:
+      - id
+      - name
+      - plan
+      - payment_status
+      - created_at
+      - support_tier
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        An [access token](https://docs.pinecone.io/guides/organizations/manage-service-accounts#retrieve-an-access-token) must be provided in the `Authorization` header using the `Bearer` scheme.
+security:
+- BearerAuth: []
+tags:
+- name: API Keys
+  description: Actions that manage API Keys.
+- name: Organizations
+  description: Actions that manage organizations.
+- name: Projects
+  description: Actions that manage projects.
