@@ -111,7 +111,35 @@ message FetchRequest {
   string          namespace = 2;
 }
 
-// The response for the `fetch` operation.
+message FetchByMetadataRequest{
+    string namespace = 1;
+
+    // Metadata filter
+    optional google.protobuf.Struct filter = 2;
+
+    // Max number of ids to return
+    optional uint32 limit = 3;
+
+    // Pagination token to continue a previous listing operation
+    optional string pagination_token = 4;
+}
+
+// The response for the `FetchByMetadata` operation.
+message FetchByMetadataResponse {
+  // The fetched vectors, in the form of a map between the fetched ids and the fetched vectors
+  map<string, Vector> vectors = 1;
+
+  // The namespace of the vectors.
+  string          namespace = 2;
+
+  //  The usage for this operation.
+  optional Usage usage = 3;
+
+  // Pagination token to continue past this listing
+  optional Pagination pagination = 4;
+}
+
+// The response for the `FetchByMetadata` operation.
 message FetchResponse {
   // The fetched vectors, in the form of a map between the fetched ids and the fetched vectors
   map<string, Vector> vectors = 1;
@@ -121,58 +149,6 @@ message FetchResponse {
 
   //  The usage for this operation.
   optional Usage usage = 3;
-}
-
-message FetchByMetadataRequest{
-    string namespace = 1;
-    // Metadata filter
-    optional google.protobuf.Struct filter = 2 [
-        (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-            example: "{\"genre\": {\"$in\": [\"comedy\", \"documentary\", \"drama\"]}, \"year\": {\"$eq\": 2019}}"
-        }
-    ];
-    // Max number of ids to return
-    optional uint32 limit = 3 [
-        (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "12", default: "100"}
-    ];
-    // Pagination token to continue a previous listing operation
-    optional string pagination_token = 4 [
-        (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "Tm90aGluZyB0byBzZWUgaGVyZQo=", default: ""}
-    ];
-}
-
-// The response for the `FetchByMetadata` operation.
-message FetchByMetadataResponse {
-  // The fetched vectors, in the form of a map between the fetched ids and the fetched vectors
-  map<string, Vector> vectors = 1;
-
-  // The namespace of the vectors.
-  string          namespace = 2 [
-    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"example-namespace\"", default: ""}
-  ];
-
-  //  The usage for this operation.
-  optional Usage usage = 3 [
-    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "{\"read_units\": 5}"}
-  ];
-
-  // Pagination token to continue past this listing
-  optional Pagination pagination = 4;
-}
-// The response for the `FetchByMetadata` operation.
-message FetchResponse {
-  // The fetched vectors, in the form of a map between the fetched ids and the fetched vectors
-  map<string, Vector> vectors = 1;
-
-  // The namespace of the vectors.
-  string          namespace = 2 [
-    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"example-namespace\"", default: ""}
-  ];
-
-  //  The usage for this operation.
-  optional Usage usage = 3 [
-    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "{\"read_units\": 5}"}
-  ];
 }
 
 
@@ -303,7 +279,7 @@ message UpdateRequest {
   repeated float values = 2;
 
   // Sparse vector data.
-  SparseValues           sparse_values = 5;
+  SparseValues sparse_values = 5;
 
   // Metadata to set for the vector.
   google.protobuf.Struct set_metadata = 3;
@@ -347,7 +323,7 @@ message ListNamespacesRequest {
   // Max number of namespaces to return
   optional uint32 limit = 2;
   // Prefix of the namespaces to list
-  optional string prefix = 3
+  optional string prefix = 3;
 }
 
 // The response for the list namespace operation.
@@ -357,7 +333,7 @@ message ListNamespacesResponse {
   // Pagination token to continue past this listing
   optional Pagination pagination = 2;
   // The total number of namespaces in the index matching the prefix
-  int32 total_count = 3
+  int32 total_count = 3;
 }
 
 // The request for the describe namespace operation.
@@ -599,10 +575,6 @@ service VectorService {
     option (google.api.http) = {
         post: "/vectors/fetch_by_metadata"
         body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      operation_id: "fetch_by_metadata";
-      tags: "Vector Operations";
     };
   }
 }

@@ -454,7 +454,7 @@ paths:
       description: |-
         Look up and return vectors by metadata filter from a single namespace. The returned vectors include the vector data and/or metadata.
         For guidance and examples, see [Fetch data](https://docs.pinecone.io/guides/manage-data/fetch-data).
-      operationId: fetch_by_metadata
+      operationId: fetch_vectors_by_metadata
       parameters:
       - in: header
         name: X-Pinecone-Api-Version
@@ -1340,11 +1340,18 @@ components:
                     type: boolean
           required:
           - fields
-        total_count:
-          example: 25
-          description: The total number of namespaces in the index matching the prefix
-          type: integer
-          format: int32
+        indexed_fields:
+          description: A list of all indexed metatadata fields in the namespace
+          type: object
+          properties:
+            fields:
+              type: array
+              items:
+                type: string
+              example:
+              - genre
+              - year
+              - author
     ListNamespacesResponse:
       type: object
       properties:
@@ -1355,6 +1362,11 @@ components:
             $ref: '#/components/schemas/NamespaceDescription'
         pagination:
           $ref: '#/components/schemas/Pagination'
+        total_count:
+          example: 25
+          description: The total number of namespaces in the index matching the prefix
+          type: integer
+          format: int32
     QueryRequest:
       description: The request for the `query` operation.
       type: object
@@ -1598,8 +1610,6 @@ components:
           example: example-vector-1
           description: Vector's unique id.
           type: string
-          required:
-          - id
           minLength: 1
           maxLength: 512
         values:

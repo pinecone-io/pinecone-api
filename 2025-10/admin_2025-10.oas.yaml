@@ -710,7 +710,7 @@ paths:
       - API Keys
       summary: List API keys
       description: List all API keys in a project.
-      operationId: list_api_keys
+      operationId: list_project_api_keys
       parameters:
       - in: header
         name: X-Pinecone-Api-Version
