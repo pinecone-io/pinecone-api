@@ -14,7 +14,7 @@ servers:
 - url: https://api.pinecone.io
   description: Production server
 paths:
-  /prometheus/project/{project_id}/metrics/discover:
+  /prometheus/projects/{project_id}/metrics/discover:
     get:
       tags:
       - Metrics
