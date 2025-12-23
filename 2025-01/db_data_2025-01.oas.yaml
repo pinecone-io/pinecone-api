@@ -334,6 +334,8 @@ paths:
       description: |-
         Look up and return vectors, by ID, from a single namespace. The returned vectors include the vector data and/or metadata.
 
+        For on-demand indexes, since vector values are retrieved from object storage, fetch operations may have increased latency. If you only need metadata or IDs, consider using the query operation with `includeValues` set to `false` instead.
+
         For guidance and examples, see [Fetch data](https://docs.pinecone.io/guides/manage-data/fetch-data).
       operationId: fetchVectors
       parameters:
@@ -909,7 +911,9 @@ components:
           type: object
         includeValues:
           example: true
-          description: Indicates whether vector values are included in the response.
+          description: >-
+            Indicates whether vector values are included in the response.
+            For on-demand indexes, setting this to `true` may increase latency, especially with higher `topK` values, because vector values are retrieved from object storage. Unless you need vector values, set this to `false` for better performance.
           default: 'false'
           type: boolean
         includeMetadata:
