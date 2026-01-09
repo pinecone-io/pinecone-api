@@ -547,6 +547,8 @@ paths:
           type: string
         style: simple
       requestBody:
+        description: |
+          Each record in the request body must include an `_id` field and a field that matches your index's `field_map` configuration (such as `chunk_text` or `data`). All other fields are stored as metadata.
         content:
           application/x-ndjson:
             schema:
