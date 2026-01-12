@@ -109,7 +109,7 @@ paths:
                   maxLength: 63
                 instructions:
                   nullable: true
-                  description: Description or directive for the assistant to apply to all responses.
+                  description: Description or directive for the assistant to apply to all responses. Maximum 16 KB.
                   type: string
                 metadata:
                   description: Optional metadata associated with the assistant. Metadata is a JSON object that can store custom organizational data, tags, and attributes. Maximum size is 16KB.
@@ -360,7 +360,7 @@ paths:
               properties:
                 instructions:
                   nullable: true
-                  description: Description or directive for the assistant to apply to all responses.
+                  description: Description or directive for the assistant to apply to all responses. Maximum 16 KB.
                   type: string
                 metadata:
                   description: Optional metadata associated with the assistant. Metadata is a JSON object that can store custom organizational data, tags, and attributes. Maximum size is 16KB.
