@@ -2378,28 +2378,7 @@ components:
           - dotproduct
           type: string
         schema:
-          example:
-            fields:
-              description:
-                filterable: true
-              genre:
-                filterable: true
-              year:
-                filterable: true
-          description: 'Schema for the behavior of Pinecone''s internal metadata index. By default, all metadata is indexed; when `schema` is present, only fields which are present in the `fields` object with a `filterable: true` are indexed. Note that `filterable: false` is not currently supported.'
-          type: object
-          properties:
-            fields:
-              description: A map of metadata field names to their configuration. The field name must be a valid metadata field name. The field name must be unique.
-              type: object
-              additionalProperties:
-                type: object
-                properties:
-                  filterable:
-                    description: Whether the field is filterable. If true, the field is indexed and can be used in filters. Only true values are allowed.
-                    type: boolean
-          required:
-          - fields
+          $ref: '#/components/schemas/MetadataSchema'
         record_count:
           example: 120000
           description: Total number of records in the backup.
@@ -2450,28 +2429,7 @@ components:
           description: The name of the collection to be used as the source for the index.
           type: string
         schema:
-          example:
-            fields:
-              description:
-                filterable: true
-              genre:
-                filterable: true
-              year:
-                filterable: true
-          description: 'Schema for the behavior of Pinecone''s internal metadata index. By default, all metadata is indexed; when `schema` is present, only fields which are present in the `fields` object with a `filterable: true` are indexed. Note that `filterable: false` is not currently supported.'
-          type: object
-          properties:
-            fields:
-              description: A map of metadata field names to their configuration. The field name must be a valid metadata field name. The field name must be unique.
-              type: object
-              additionalProperties:
-                type: object
-                properties:
-                  filterable:
-                    description: Whether the field is filterable. If true, the field is indexed and can be used in filters. Only true values are allowed.
-                    type: boolean
-          required:
-          - fields
+          $ref: '#/components/schemas/MetadataSchema'
       required:
       - cloud
       - region
@@ -2783,28 +2741,7 @@ components:
           description: The name of the collection to be used as the source for the index.
           type: string
         schema:
-          example:
-            fields:
-              description:
-                filterable: true
-              genre:
-                filterable: true
-              year:
-                filterable: true
-          description: 'Schema for the behavior of Pinecone''s internal metadata index. By default, all metadata is indexed; when `schema` is present, only fields which are present in the `fields` object with a `filterable: true` are indexed. Note that `filterable: false` is not currently supported.'
-          type: object
-          properties:
-            fields:
-              description: A map of metadata field names to their configuration. The field name must be a valid metadata field name. The field name must be unique.
-              type: object
-              additionalProperties:
-                type: object
-                properties:
-                  filterable:
-                    description: Whether the field is filterable. If true, the field is indexed and can be used in filters. Only true values are allowed.
-                    type: boolean
-          required:
-          - fields
+          $ref: '#/components/schemas/MetadataSchema'
       required:
       - cloud
       - region
@@ -3135,28 +3072,7 @@ components:
         tags:
           $ref: '#/components/schemas/IndexTags'
         schema:
-          example:
-            fields:
-              description:
-                filterable: true
-              genre:
-                filterable: true
-              year:
-                filterable: true
-          description: 'Schema for the behavior of Pinecone''s internal metadata index. By default, all metadata is indexed; when `schema` is present, only fields which are present in the `fields` object with a `filterable: true` are indexed. Note that `filterable: false` is not currently supported.'
-          type: object
-          properties:
-            fields:
-              description: A map of metadata field names to their configuration. The field name must be a valid metadata field name. The field name must be unique.
-              type: object
-              additionalProperties:
-                type: object
-                properties:
-                  filterable:
-                    description: Whether the field is filterable. If true, the field is indexed and can be used in filters. Only true values are allowed.
-                    type: boolean
-          required:
-          - fields
+          $ref: '#/components/schemas/MetadataSchema'
         read_capacity:
           $ref: '#/components/schemas/ReadCapacity'
         embed:
@@ -3269,30 +3185,32 @@ components:
           description: The environment where the index is hosted.
           type: string
         schema:
-          example:
-            fields:
-              description:
-                filterable: true
-              genre:
-                filterable: true
-              year:
-                filterable: true
-          description: 'Schema for the behavior of Pinecone''s internal metadata index. By default, all metadata is indexed; when `schema` is present, only fields which are present in the `fields` object with a `filterable: true` are indexed. Note that `filterable: false` is not currently supported.'
-          type: object
-          properties:
-            fields:
-              description: A map of metadata field names to their configuration. The field name must be a valid metadata field name. The field name must be unique.
-              type: object
-              additionalProperties:
-                type: object
-                properties:
-                  filterable:
-                    description: Whether the field is filterable. If true, the field is indexed and can be used in filters. Only true values are allowed.
-                    type: boolean
-          required:
-          - fields
+          $ref: '#/components/schemas/MetadataSchema'
       required:
       - environment
+    MetadataSchema:
+      example:
+        fields:
+          description:
+            filterable: true
+          genre:
+            filterable: true
+          year:
+            filterable: true
+      description: 'Schema for the behavior of Pinecone''s internal metadata index. By default, all metadata is indexed; when `schema` is present, only fields which are present in the `fields` object with a `filterable: true` are indexed. Note that `filterable: false` is not currently supported.'
+      type: object
+      properties:
+        fields:
+          description: A map of metadata field names to their configuration. The field name must be a valid metadata field name. The field name must be unique.
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              filterable:
+                description: Whether the field is filterable. If true, the field is indexed and can be used in filters. Only true values are allowed.
+                type: boolean
+      required:
+      - fields
   securitySchemes:
     ApiKeyAuth:
       type: apiKey

@@ -112,6 +112,7 @@ paths:
                   description: Description or directive for the assistant to apply to all responses.
                   type: string
                 metadata:
+                  description: Optional metadata associated with the assistant. Metadata is a JSON object that can store custom organizational data, tags, and attributes. Maximum size is 16KB.
                   type: object
                 region:
                   description: The region to deploy the assistant in. Our current options are either us or eu. Defaults to us.
@@ -362,6 +363,7 @@ paths:
                   description: Description or directive for the assistant to apply to all responses.
                   type: string
                 metadata:
+                  description: Optional metadata associated with the assistant. Metadata is a JSON object that can store custom organizational data, tags, and attributes. Maximum size is 16KB.
                   nullable: true
                   type: object
         required: true
@@ -379,6 +381,7 @@ paths:
                     description: Description or directive for the assistant to apply to all responses.
                     type: string
                   metadata:
+                    description: Optional metadata associated with the assistant. Metadata is a JSON object that can store custom organizational data, tags, and attributes.
                     type: object
         '400':
           description: Bad Request
@@ -459,6 +462,7 @@ components:
           description: Description or directive for the assistant to apply to all responses.
           type: string
         metadata:
+          description: Optional metadata associated with the assistant. Metadata is a JSON object that can store custom organizational data, tags, and attributes.
           nullable: true
           type: object
         status:
