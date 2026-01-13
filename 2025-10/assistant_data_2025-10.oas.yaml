@@ -1013,7 +1013,7 @@ components:
           type: string
           format: date-time
         status:
-          description: >-
+          description: |-
             The current state of the uploaded file. Possible values:
             - `Processing`: File is being processed (parsed, chunked, embedded)
             - `Available`: Processing completed successfully; file is ready for use
