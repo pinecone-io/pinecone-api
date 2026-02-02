@@ -594,10 +594,7 @@ paths:
       tags:
       - Manage Indexes
       summary: Configure an index
-      description: |-
-        Configure an existing index. For serverless indexes, you can configure index deletion protection, tags, and integrated inference embedding settings for the index. For pod-based indexes, you can configure the pod size, number of replicas, tags, and index deletion protection.
-
-        It is not possible to change the pod type of a pod-based index. However, you can create a collection from a pod-based index and then [create a new pod-based index with a different pod type](http://docs.pinecone.io/guides/indexes/pods/create-a-pod-based-index#create-a-pod-index-from-a-collection) from the collection. For guidance and examples, see [Configure an index](http://docs.pinecone.io/guides/indexes/pods/manage-pod-based-indexes).
+      description: Configure an existing index. For guidance and examples, see [Manage indexes](https://docs.pinecone.io/guides/manage-data/manage-indexes).
       operationId: configure_index
       parameters:
       - in: header
@@ -2610,11 +2607,13 @@ components:
             required:
             - pod
             additionalProperties: false
+          # BYOC responses use ByocSpecResponse (not ByocSpec) because responses
+          # include read_capacity.status fields that requests don't send.
           - title: BYOC
             type: object
             properties:
               byoc:
-                $ref: '#/components/schemas/ByocSpec'
+                $ref: '#/components/schemas/ByocSpecResponse'
             required:
             - byoc
             additionalProperties: false
@@ -2717,7 +2716,7 @@ components:
       - mode
       additionalProperties: false
     ServerlessSpecResponse:
-      description: Configuration needed to deploy a serverless index.
+      description: Configuration of a serverless index.
       type: object
       properties:
         cloud:
@@ -2784,6 +2783,20 @@ components:
                     type: string
             required:
             - pod
+            additionalProperties: false
+          # BYOC indexes support updating read_capacity.
+          # Only read_capacity is configurable; environment cannot be changed after creation.
+          - title: BYOC
+            type: object
+            properties:
+              byoc:
+                description: Updated configuration for a BYOC index
+                type: object
+                properties:
+                  read_capacity:
+                    $ref: '#/components/schemas/ReadCapacity'
+            required:
+            - byoc
             additionalProperties: false
         deletion_protection:
           $ref: '#/components/schemas/DeletionProtection'
@@ -3173,6 +3186,8 @@ components:
       - disabled
       - enabled
       type: string
+    # ByocSpec: Used for CREATE index requests.
+    # For responses (describe/list), use ByocSpecResponse instead.
     ByocSpec:
       example:
         environment: aws-us-east-1-b921
@@ -3184,10 +3199,31 @@ components:
           example: aws-us-east-1-b921
           description: The environment where the index is hosted.
           type: string
+        # read_capacity configures read scaling (OnDemand or Dedicated/DRN).
+        read_capacity:
+          $ref: '#/components/schemas/ReadCapacity'
         schema:
           $ref: '#/components/schemas/MetadataSchema'
       required:
       - environment
+    # ByocSpecResponse: Used for RESPONSE schemas (describe/list index).
+    # References ReadCapacityResponse which includes status fields.
+    ByocSpecResponse:
+      title: BYOC
+      description: Configuration of a BYOC index.
+      type: object
+      properties:
+        environment:
+          example: aws-us-east-1-b921
+          description: The environment where the index is hosted.
+          type: string
+        read_capacity:
+          $ref: '#/components/schemas/ReadCapacityResponse'
+        schema:
+          $ref: '#/components/schemas/MetadataSchema'
+      required:
+      - environment
+      - read_capacity
     MetadataSchema:
       example:
         fields:
