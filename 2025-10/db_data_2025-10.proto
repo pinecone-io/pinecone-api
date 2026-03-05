@@ -239,6 +239,19 @@ message QueryRequest {
 
   // The unique ID of the vector to be used as a query vector. Each request can contain either the `vector` or `id` parameter.
   string                 id        = 8;
+
+  // An optimization parameter for IVF dense indexes in dedicated read node indexes.
+  // It adjusts how much of the index is scanned to find vector candidates.
+  // Range: 0.5 – 4 (default).
+  // This parameter is only supported for dedicated (DRN) dense indexes.
+  optional float scan_factor = 10;
+
+  // An optimization parameter that controls the maximum number of candidate dense
+  // vectors to rerank. Reranking computes exact distances to improve recall but
+  // increases query latency.
+  // Range: top_k – 100000.
+  // This parameter is only supported for dedicated (DRN) dense indexes.
+  optional uint32 max_candidates = 11;
 }
 
 // The query results for a single `QueryVector`

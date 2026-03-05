@@ -671,7 +671,7 @@ paths:
       description: |-
         Upsert text into a namespace. Pinecone converts the text to vectors automatically using the hosted embedding model associated with the index.
 
-        Upserting text is supported only for [indexes with integrated embedding](https://docs.pinecone.io/reference/api/2025-01/control-plane/create_for_model).
+        Upserting text is supported only for [indexes with integrated embedding](https://docs.pinecone.io/guides/index-data/create-an-index#embedding-models).
 
         For guidance, examples, and limits, see [Upsert data](https://docs.pinecone.io/guides/index-data/upsert-data).
       operationId: upsertRecordsNamespace

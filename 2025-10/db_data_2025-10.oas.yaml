@@ -904,7 +904,7 @@ paths:
       description: |-
         Upsert text into a namespace. Pinecone converts the text to vectors automatically using the hosted embedding model associated with the index.
 
-        Upserting text is supported only for [indexes with integrated embedding](https://docs.pinecone.io/reference/api/2025-01/control-plane/create_for_model).
+        Upserting text is supported only for [indexes with integrated embedding](https://docs.pinecone.io/guides/index-data/create-an-index#embedding-models).
 
         For guidance, examples, and limits, see [Upsert data](https://docs.pinecone.io/guides/index-data/upsert-data).
       operationId: upsertRecordsNamespace
@@ -1443,6 +1443,36 @@ components:
           description: The unique ID of the vector to be used as a query vector. Each request  can contain either the `vector` or `id` parameter.
           type: string
           maxLength: 512
+        scanFactor:
+          type: number
+          format: float
+          example: 2.0
+          minimum: 0.5
+          maximum: 4.0
+          description: >-
+            An optimization parameter for IVF dense indexes in dedicated read node indexes.
+            It adjusts how much of the index is scanned to find vector candidates.
+            Range: 0.5 – 4 (default).
+
+            Keep the default (4.0) for the best search results. If query latency is too high,
+            try lowering this value incrementally (minimum 0.5) to speed up the search at the
+            cost of slightly lower accuracy.
+            This parameter is only supported for dedicated (DRN) dense indexes. 
+        maxCandidates:
+          type: integer
+          format: int64
+          example: 1000
+          minimum: 1 
+          maximum: 100000
+          description: >-
+            An optimization parameter that controls the maximum number of candidate dense
+            vectors to rerank. Reranking computes exact distances to improve recall but
+            increases query latency.
+            Range: top_k – 100000.
+
+            Keep the default for a balance of recall and latency. Increase this value if
+            recall is too low, or decrease it to reduce latency at the cost of accuracy.
+            This parameter is only supported for dedicated (DRN) dense indexes.
       required:
       - topK
     QueryResponse:
