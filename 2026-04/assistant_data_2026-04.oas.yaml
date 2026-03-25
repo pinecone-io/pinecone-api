@@ -1,0 +1,2054 @@
+openapi: 3.0.3
+info:
+  title: Pinecone assistant data plane API
+  description: Pinecone Assistant Engine is a context engine to store and retrieve relevant knowledge from millions of documents at scale. This API supports interactions with assistants.
+  contact:
+    name: Pinecone Support
+    url: https://support.pinecone.io
+    email: support@pinecone.io
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+  version: 2026-04
+servers:
+- url: https://{assistant_host}
+  variables:
+    assistant_host:
+      default: unknown
+      description: The host of the created assistant
+paths:
+  /files/{assistant_name}:
+    get:
+      tags:
+      - Manage Assistants
+      summary: List Files
+      description: |-
+        List all files in an assistant, with an option to filter files with metadata.
+
+        For guidance and examples, see [Manage files](https://docs.pinecone.io/guides/assistant/manage-files#list-files-in-an-assistant).
+      operationId: list_files
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2026-04
+          type: string
+        style: simple
+      - in: path
+        name: assistant_name
+        description: The name of the assistant to list files for.
+        required: true
+        schema:
+          type: string
+        example: test-assistant
+        style: simple
+      - in: query
+        name: filter
+        description: Optional JSON-encoded metadata filter for files.
+        schema:
+          type: string
+          format: json
+        example: '{"genre":{"$eq":"comedy"}}'
+        style: form
+      - in: query
+        name: limit
+        description: Limit on the number of files to return.
+        schema:
+          type: integer
+        example: 100
+        style: form
+      - in: query
+        name: pagination_token
+        description: Pagination token to continue a previous listing operation.
+        schema:
+          type: string
+        example: dXNlcl9pZD11c2VyXzE=
+        style: form
+      responses:
+        '200':
+          description: This operation returns a list of all files that you have previously uploaded, and which are associated with the given assistant name.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListFilesResponse'
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '404':
+          description: Assistant not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                assistant-not-found:
+                  summary: Assistant not found.
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Assistant "example-assistant" not found.
+                    status: 404
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+    post:
+      tags:
+      - Manage Assistants
+      summary: Upload a file
+      description: |-
+        Upload a file to the specified assistant.
+
+        An identifier will be generated. To specify a file identifier or to replace file content, use the upsert endpoint (`PUT /files/{assistant_name}/{assistant_file_id}`).
+
+        This operation is asynchronous. The response includes an operation ID that can be used to poll for completion via the describe operation endpoint.
+
+        For guidance and examples, see [Manage files](https://docs.pinecone.io/guides/assistant/manage-files#upload-a-local-file).
+      operationId: upload_file
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2026-04
+          type: string
+        style: simple
+      - in: path
+        name: assistant_name
+        description: The name of the assistant to upload files to.
+        required: true
+        schema:
+          type: string
+        example: test-assistant
+        style: simple
+      - in: query
+        name: multimodal
+        description: Optional flag to opt in to multimodal file processing (PDFs only). Can be either `true` or `false`. Default is `false`.
+        schema:
+          x-enum:
+          - 'true'
+          - 'false'
+          type: string
+        style: form
+      requestBody:
+        description: The desired file to be uploaded and processed into the assistant.
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FileData'
+        required: true
+      responses:
+        '202':
+          description: File upload accepted. Processing has started.
+          headers:
+            Location:
+              description: URL to the operation resource for polling status.
+              style: simple
+              schema:
+                example: /operations/test-assistant/op-1234-abcd
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationModel'
+        '400':
+          description: Bad request. The request body included invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                files-validation-error:
+                  summary: Validation error on ingest.
+                  value:
+                    error:
+                      code: INVALID_ARGUMENT
+                      message: Uploaded file can only currently be either a pdf or txt file
+                    status: 400
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '404':
+          description: Assistant not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                assistant-not-found:
+                  summary: Assistant not found.
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Assistant "example-assistant" not found.
+                    status: 404
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+  /files/{assistant_name}/{assistant_file_id}:
+    get:
+      tags:
+      - Manage Assistants
+      summary: Describe a file
+      description: '[Get the current status and metadata of a file](https://docs.pinecone.io/guides/assistant/manage-files#get-the-status-of-a-file) uploaded to an assistant.'
+      operationId: describe_file
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2026-04
+          type: string
+        style: simple
+      - in: path
+        name: assistant_name
+        description: The name of the assistant that contains the file.
+        required: true
+        schema:
+          type: string
+        example: test-assistant
+        style: simple
+      - in: path
+        name: assistant_file_id
+        description: The identifier of the file to be described.
+        required: true
+        schema:
+          type: string
+        example: my-file-id-123
+        style: simple
+      - in: query
+        name: include_url
+        description: Include the signed URL of the file in the response.
+        schema:
+          x-enum:
+          - 'true'
+          - 'false'
+          type: string
+        style: form
+      responses:
+        '200':
+          description: Poll request successful.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssistantFileModel'
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '404':
+          description: File not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                file-not-found:
+                  summary: File not found.
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: File with id 72490b32-46d9-4db1-b48b-666e9176d9be  not found in provided assistant
+                    status: 404
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+    put:
+      tags:
+      - Manage Assistants
+      summary: Upsert a file
+      description: |-
+        Create or replace a file in the specified assistant. If a file with the given `assistant_file_id` already exists, it will be replaced with the new file. If it doesn't exist, a new file will be created with that identifier.
+
+        This operation is asynchronous. The file processing will occur in the background.
+
+        For guidance and examples, see [Manage files](https://docs.pinecone.io/guides/assistant/manage-files#upload-a-local-file).
+      operationId: upsert_file
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2026-04
+          type: string
+        style: simple
+      - in: path
+        name: assistant_name
+        description: The name of the assistant to upload files to.
+        required: true
+        schema:
+          type: string
+        example: test-model
+        style: simple
+      - in: path
+        name: assistant_file_id
+        description: The identifier of the file to be created or replaced. Must be 1-128 characters long and consist only of alphanumeric characters, hyphens (-), or underscores (_).
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+        example: my-file-id-123
+        style: simple
+      - in: query
+        name: multimodal
+        description: Optional flag to opt in to multimodal file processing (PDFs only). Can be either `true` or `false`. Default is `false`.
+        schema:
+          x-enum:
+          - 'true'
+          - 'false'
+          type: string
+        style: form
+      requestBody:
+        description: The desired file to be uploaded and processed into the assistant.
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FileData'
+        required: true
+      responses:
+        '202':
+          description: File upload has been accepted for processing. The file will be created if it doesn't exist, or replaced if it already exists. The operation will complete asynchronously.
+          headers:
+            Location:
+              description: URL to the operation resource for polling status.
+              style: simple
+              schema:
+                example: /operations/test-assistant/op-1234-abcd
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationModel'
+        '400':
+          description: Bad request. The request body included invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                files-validation-error:
+                  summary: Validation error on ingest.
+                  value:
+                    error:
+                      code: INVALID_ARGUMENT
+                      message: Uploaded file can only currently be either a pdf or txt file
+                    status: 400
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '404':
+          description: Assistant not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                assistant-not-found:
+                  summary: Assistant not found.
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Assistant "example-assistant" not found.
+                    status: 404
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+    delete:
+      tags:
+      - Manage Assistants
+      summary: Delete a file
+      description: |-
+        [Delete an uploaded file](https://docs.pinecone.io/guides/assistant/manage-files#delete-a-file) from an assistant.
+
+        This operation is asynchronous. The response includes an operation ID that can be used to poll for completion via the describe operation endpoint.
+      operationId: delete_file
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2026-04
+          type: string
+        style: simple
+      - in: path
+        name: assistant_name
+        description: The name of the assistant that contains the file.
+        required: true
+        schema:
+          type: string
+        example: test-assistant
+        style: simple
+      - in: path
+        name: assistant_file_id
+        description: The identifier of the file to be deleted.
+        required: true
+        schema:
+          type: string
+        example: my-file-id-123
+        style: simple
+      responses:
+        '202':
+          description: The request to delete the file has been accepted. The deletion will be processed asynchronously.
+          headers:
+            Location:
+              description: URL to the operation resource for polling status.
+              style: simple
+              schema:
+                example: /operations/test-assistant/op-1234-abcd
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationModel'
+        '204':
+          description: The file was deleted immediately. This occurs when deleting a file that previously failed processing.
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '404':
+          description: File not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                file-not-found:
+                  summary: File not found.
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: File with id 72490b32-46d9-4db1-b48b-666e9176d9be  not found in provided assistant
+                    status: 404
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+  /operations/{assistant_name}:
+    get:
+      tags:
+      - Manage Assistants
+      summary: List operations
+      description: |
+        List all operations for an assistant. Returns operations that are in progress, as well as recently completed or failed operations.
+        Both successful and failed operations are retained for 30 days after completion.
+        Use the `operation_type` and `status` query parameters to filter results.
+      operationId: list_operations
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2026-04
+          type: string
+        style: simple
+      - in: path
+        name: assistant_name
+        description: The name of the assistant to list operations for.
+        required: true
+        schema:
+          type: string
+        example: test-assistant
+        style: simple
+      - in: query
+        name: operation_type
+        description: Filter operations by type.
+        schema:
+          x-enum:
+          - upload_file
+          - upsert_file
+          - update_file_metadata
+          - delete_file
+          type: string
+        example: upload_file
+        style: form
+      - in: query
+        name: status
+        description: Filter operations by status.
+        schema:
+          x-enum:
+          - Processing
+          - Completed
+          - Failed
+          type: string
+        example: Processing
+        style: form
+      - in: query
+        name: limit
+        description: Limit on the number of operations to return.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+        example: 100
+        style: form
+      - in: query
+        name: pagination_token
+        description: Pagination token to continue a previous listing operation.
+        schema:
+          type: string
+        example: dXNlcl9pZD11c2VyXzE=
+        style: form
+      responses:
+        '200':
+          description: A list of operations.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationList'
+              examples:
+                multiple-operations:
+                  summary: Multiple operations with different states
+                  value:
+                    operations:
+                    - created_on: 2025-10-01T12:30:00Z
+                      file_id: my-report-2025
+                      id: op-1234-abcd-5678
+                      operation_type: upload_file
+                      percent_complete: 42
+                      status: Processing
+                    - completed_on: 2025-10-01T12:05:00Z
+                      created_on: 2025-10-01T12:00:00Z
+                      file_id: quarterly-analysis
+                      id: op-8765-dcba-4321
+                      operation_type: upload_file
+                      percent_complete: 100
+                      status: Completed
+                    - completed_on: 2025-10-01T11:32:00Z
+                      created_on: 2025-10-01T11:30:00Z
+                      error_message: 'File processing failed: unsupported file format.'
+                      file_id: invalid-file
+                      id: op-5555-eeee-9999
+                      operation_type: upload_file
+                      percent_complete: 15
+                      status: Failed
+                    - completed_on: 2025-10-01T11:02:00Z
+                      created_on: 2025-10-01T11:00:00Z
+                      file_id: old-report
+                      id: op-7777-ffff-0000
+                      operation_type: delete_file
+                      percent_complete: 100
+                      status: Completed
+                    pagination:
+                      next: dXNlcl9pZD11c2VyXzE=
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '404':
+          description: Assistant not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                assistant-not-found:
+                  summary: Assistant not found.
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Assistant "example-assistant" not found.
+                    status: 404
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+  /operations/{assistant_name}/{operation_id}:
+    get:
+      tags:
+      - Manage Assistants
+      summary: Describe an operation
+      description: |
+        Get the status of an operation.
+      operationId: describe_operation
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2026-04
+          type: string
+        style: simple
+      - in: path
+        name: assistant_name
+        description: The name of the assistant.
+        required: true
+        schema:
+          type: string
+        example: test-assistant
+        style: simple
+      - in: path
+        name: operation_id
+        description: The identifier of the operation to be described.
+        required: true
+        schema:
+          type: string
+        example: op-1234-abcd-5678
+        style: simple
+      responses:
+        '200':
+          description: Current information and status of the operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationModel'
+              examples:
+                processing-operation:
+                  summary: An upload operation in progress
+                  value:
+                    created_on: 2025-10-01T12:30:00Z
+                    file_id: my-report-2025
+                    id: op-1234-abcd-5678
+                    operation_type: upload_file
+                    percent_complete: 42
+                    status: Processing
+                completed-operation:
+                  summary: A completed upload operation
+                  value:
+                    completed_on: 2025-10-01T12:35:00Z
+                    created_on: 2025-10-01T12:30:00Z
+                    file_id: my-report-2025
+                    id: op-1234-abcd-5678
+                    operation_type: upload_file
+                    percent_complete: 100
+                    status: Completed
+                failed-operation:
+                  summary: A failed operation
+                  value:
+                    completed_on: 2025-10-01T11:32:00Z
+                    created_on: 2025-10-01T11:30:00Z
+                    error_message: 'File processing failed: unsupported file format.'
+                    file_id: invalid-file
+                    id: op-5555-eeee-9999
+                    operation_type: upload_file
+                    percent_complete: 15
+                    status: Failed
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '404':
+          description: Operation not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                operation-not-found:
+                  summary: Operation not found.
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Operation 1234-abcd-5678 not found.
+                    status: 404
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+  /chat/{assistant_name}/chat/completions:
+    post:
+      tags:
+      - Manage Assistants
+      summary: Chat through an OpenAI-compatible interface
+      description: "Chat with an assistant. This endpoint is based on the OpenAI Chat Completion API, a commonly used and adopted API. \n\nIt is useful if you need inline citations or OpenAI-compatible responses, but has limited functionality compared to the standard chat interface.\n\nFor guidance and examples, see [Chat with an assistant](https://docs.pinecone.io/guides/assistant/chat-with-assistant)."
+      operationId: chat_completion_assistant
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2026-04
+          type: string
+        style: simple
+      - in: path
+        name: assistant_name
+        description: The name of the assistant to be described.
+        required: true
+        schema:
+          type: string
+        example: test-assistant
+        style: simple
+      requestBody:
+        description: The desired configuration to chat with an assistant through an OpenAI-compatible interface.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchCompletions'
+        required: true
+      responses:
+        '200':
+          description: Search request successful.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatCompletionModel'
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/StreamChatCompletionChunkModel'
+        '400':
+          description: Bad request. The request body included invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                files-validation-error:
+                  summary: Validation error on ingest.
+                  value:
+                    error:
+                      code: INVALID_ARGUMENT
+                      message: Uploaded file can only currently be either a pdf or txt file
+                    status: 400
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '404':
+          description: Assistant not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                assistant-not-found:
+                  summary: Assistant not found.
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Assistant "example-assistant" not found.
+                    status: 404
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+  /chat/{assistant_name}:
+    post:
+      tags:
+      - Manage Assistants
+      summary: Chat with an assistant
+      description: "Chat with an assistant and get back citations in structured form. \n\nThis is the recommended way to chat with an assistant, as it offers more functionality and control over the assistant's responses and references than the OpenAI-compatible chat interface.\n\nFor guidance and examples, see [Chat with an assistant](https://docs.pinecone.io/guides/assistant/chat-with-assistant)."
+      operationId: chat_assistant
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2026-04
+          type: string
+        style: simple
+      - in: path
+        name: assistant_name
+        description: The name of the assistant to be described.
+        required: true
+        schema:
+          type: string
+        example: test-assistant
+        style: simple
+      requestBody:
+        description: The desired configuration to chat with an assistant.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+        required: true
+      responses:
+        '200':
+          description: Search request successful.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatModel'
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/StreamChatChunkModel'
+        '400':
+          description: Bad request. The request body included invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                files-validation-error:
+                  summary: Validation error on ingest.
+                  value:
+                    error:
+                      code: INVALID_ARGUMENT
+                      message: Uploaded file can only currently be either a pdf or txt file
+                    status: 400
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '404':
+          description: Assistant not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                assistant-not-found:
+                  summary: Assistant not found.
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Assistant "example-assistant" not found.
+                    status: 404
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+  /chat/{assistant_name}/context:
+    post:
+      tags:
+      - Manage Assistants
+      summary: Retrieve context from an assistant
+      description: |-
+        Retrieve context snippets from an assistant to use as part of RAG or any agentic flow.
+
+        For guidance and examples, see [Retrieve context snippets](https://docs.pinecone.io/guides/assistant/retrieve-context-snippets).
+      operationId: context_assistant
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2026-04
+          type: string
+        style: simple
+      - in: path
+        name: assistant_name
+        description: The name of the assistant to be described.
+        required: true
+        schema:
+          type: string
+        example: test-assistant
+        style: simple
+      requestBody:
+        description: The desired configuration to retrieve context from an assistant.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContextRequest'
+        required: true
+      responses:
+        '200':
+          description: Context retrieval process successful.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContextModel'
+        '400':
+          description: Bad request. The request body included invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                files-validation-error:
+                  summary: Validation error on ingest.
+                  value:
+                    error:
+                      code: INVALID_ARGUMENT
+                      message: Uploaded file can only currently be either a pdf or txt file
+                    status: 400
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '404':
+          description: Assistant not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                assistant-not-found:
+                  summary: Assistant not found.
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Assistant "example-assistant" not found.
+                    status: 404
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+components:
+  schemas:
+    MessageEndModel:
+      example:
+        finish_reason: stop
+        id: 00000000000000002fe0c02e20be1c6a
+        model: gpt-4o-2024-11-20
+        type: message_end
+        usage:
+          completion_tokens: 135
+          prompt_tokens: 2506
+          total_tokens: 2641
+      title: Message end stream chunk
+      description: The end message in a stream chat response. This chunk signals that the  assistant has finished sending the response and provides the reason  generation stopped along with the token consumption for the interaction.
+      type: object
+      properties:
+        type:
+          description: The type of stream chunk. Always `message_end`.
+          type: string
+        id:
+          description: A unique identifier for this chat response.
+          type: string
+        model:
+          description: The name or identifier of the model used to generate this chat response.
+          type: string
+        finish_reason:
+          description: "Indicates why the chat response generation stopped. This signals the  end of the stream and no further chunks will be sent for this response.\n- `stop`: The model finished generating the response.  \n- `length`: Generation was cut off because the maximum number of tokens allowed was reached.\n- `content_filter`: Generation stopped because content was blocked by content filtering rules. \n  (for example, content that contains hate speech or violent material).\n\n- `tool_calls`: Generation stopped because a tool call was triggered."
+          x-enum:
+          - stop
+          - length
+          - content_filter
+          - tool_calls
+          type: string
+        usage:
+          $ref: '#/components/schemas/UsageModel'
+        content_filter_results:
+          $ref: '#/components/schemas/ContentFilterResults'
+      required:
+      - type
+      - id
+      - model
+      - finish_reason
+    MarkdownReferenceModel:
+      title: Markdown document reference
+      description: Represents a reference to a part of a markdown document.
+      type: object
+      properties:
+        type:
+          description: The type of reference. Always `markdown`.
+          type: string
+        file:
+          $ref: '#/components/schemas/AssistantFileModel'
+      required:
+      - type
+      - file
+    MultiModalSnippetModel:
+      title: Multimodal context snippet
+      description: Represents a multimodal context snippet.
+      type: object
+      properties:
+        type:
+          description: The type of context snippet. Always `multimodal`.
+          type: string
+        content:
+          description: A list of multimodal content blocks (text, images, etc.) included in this snippet.
+          type: array
+          items:
+            $ref: '#/components/schemas/MultiModalContentBlocksModel'
+        score:
+          description: A numerical score indicating the relevance of this snippet to the user's query.
+          type: number
+          format: float
+        reference:
+          $ref: '#/components/schemas/TypedReferenceModel'
+      required:
+      - type
+      - content
+      - score
+      - reference
+    MessageStartModel:
+      example:
+        context_snippet_count: 16
+        id: 00000000000000002fe0c02e20be1c6a
+        model: gpt-4o-2024-11-20
+        role: assistant
+        type: message_start
+      title: Message start stream chunk
+      description: The start message of a stream chat response. This chunk initializes the  response by providing the unique identifier, the model, and the role  of the author. It also provides the count of retrieved context snippets  available to the model before any content is sent, allowing for  decisions on how to handle cases where no relevant context was found.
+      type: object
+      properties:
+        type:
+          description: The type of stream chunk. Always `message_start`.
+          type: string
+        id:
+          description: A unique identifier for this chat response.
+          type: string
+        model:
+          description: The name or identifier of the model used to generate this chat response.
+          type: string
+        role:
+          description: The role of the message author, it can be `user`, `assistant`, or `system`.
+          type: string
+        context_snippet_count:
+          description: The number of context snippets provided to the model to generate the response. This indicates how much retrieved information was available for the  generation, allowing for logic to be applied if no context was found (count is 0).
+          type: integer
+        content_filter_results:
+          $ref: '#/components/schemas/ContentFilterResults'
+      required:
+      - type
+      - id
+      - model
+      - role
+    MultiModalContentImageBlockModel:
+      title: Multimodal image content block
+      description: Represents an image block in a multimodal context snippet.
+      type: object
+      properties:
+        type:
+          description: The type of multimodal content block. Always `image`.
+          type: string
+        caption:
+          description: A caption describing the image.
+          type: string
+        image:
+          $ref: '#/components/schemas/ImageModel'
+      required:
+      - type
+      - caption
+    ContextModel:
+      description: Describes the context returned by an assistant in response to a query.
+      type: object
+      properties:
+        id:
+          description: A unique identifier for this context response.
+          type: string
+        snippets:
+          description: A list of context snippets relevant to the user's query.
+          type: array
+          items:
+            $ref: '#/components/schemas/SnippetModel'
+        usage:
+          $ref: '#/components/schemas/UsageModel'
+      required:
+      - snippets
+      - usage
+    ChoiceModel:
+      description: Describes a single choice in a chat completion response.
+      type: object
+      properties:
+        finish_reason:
+          description: "Indicates why the chat response generation stopped. This signals the end of the response.\n- `stop`: The model finished generating the response.  \n- `length`: Generation was cut off because the maximum number of tokens allowed was reached.\n- `content_filter`: Generation stopped because content was blocked by content filtering rules. \n  (for example, content that contains hate speech or violent material).\n\n- `tool_calls`: Generation stopped because a tool call was triggered."
+          x-enum:
+          - stop
+          - length
+          - content_filter
+          - tool_calls
+          type: string
+        index:
+          description: The index of this choice in the list of returned choices.
+          type: integer
+        message:
+          $ref: '#/components/schemas/MessageModel'
+    CitationModel:
+      description: Describes a single citation included in a chat response, pointing to one or more referenced sources.
+      type: object
+      properties:
+        position:
+          description: The index position of the citation in the complete text response.
+          type: integer
+        references:
+          description: A list of file references that this citation points to.
+          type: array
+          items:
+            $ref: '#/components/schemas/ReferenceModel'
+    MessageModel:
+      description: Describes the format of a message in a chat.
+      type: object
+      properties:
+        role:
+          description: The role of the message author, it can be `user`, `assistant`, or `system`.
+          type: string
+        content:
+          description: The textual content of this partial message.
+          type: string
+    MultiModalContentBlocksModel:
+      description: Represents a block in the multimodal content of a context snippet.
+      discriminator:
+        propertyName: type
+        mapping:
+          text: '#/components/schemas/MultiModalContentTextBlockModel'
+          image: '#/components/schemas/MultiModalContentImageBlockModel'
+      type: object
+      oneOf:
+      - $ref: '#/components/schemas/MultiModalContentTextBlockModel'
+      - $ref: '#/components/schemas/MultiModalContentImageBlockModel'
+    ContentFilterResults:
+      description: Content filter results provided by the LLM, describing safety-related classifications applied to the content. The structure may vary depending on the model and the content being filtered. The `spec` field identifies the provider, and determines the structure of `results`.
+      type: object
+      properties:
+        spec:
+          description: Identifier of the model provider.
+          x-enum:
+          - openai
+          - gemini
+          type: string
+        results:
+          description: Content filter results returned by the provider. The structure depend on the `spec` value.
+    ErrorResponse:
+      example:
+        error:
+          code: TOO_MANY_REQUESTS
+          message: Too many get or list assistant requests, try again later
+        status: 429
+      description: The response shape used for all error responses.
+      type: object
+      properties:
+        status:
+          example: 500
+          description: The HTTP status code of the error.
+          type: integer
+        error:
+          example:
+            code: INVALID_ARGUMENT
+            message: 'Invalid region: Valid options are us, eu'
+          description: Detailed information about the error that occurred.
+          type: object
+          properties:
+            code:
+              description: The status code associated with the error.
+              x-enum:
+              - OK
+              - UNKNOWN
+              - INVALID_ARGUMENT
+              - DEADLINE_EXCEEDED
+              - QUOTA_EXCEEDED
+              - NOT_FOUND
+              - ALREADY_EXISTS
+              - PERMISSION_DENIED
+              - UNAUTHENTICATED
+              - RESOURCE_EXHAUSTED
+              - FAILED_PRECONDITION
+              - ABORTED
+              - OUT_OF_RANGE
+              - UNIMPLEMENTED
+              - INTERNAL
+              - UNAVAILABLE
+              - DATA_LOSS
+              - FORBIDDEN
+              - TOO_MANY_REQUESTS
+              type: string
+            message:
+              example: Message content cannot be empty
+              description: A message providing details about the error.
+              type: string
+            details:
+              description: Additional information about the error. This field is not guaranteed to be present.
+              type: object
+          required:
+          - code
+          - message
+      required:
+      - status
+      - error
+    JsonReferenceModel:
+      title: JSON document reference
+      description: Represents a reference to a JSON document.
+      type: object
+      properties:
+        type:
+          description: The type of reference. Always `json`.
+          type: string
+        file:
+          $ref: '#/components/schemas/AssistantFileModel'
+      required:
+      - type
+      - file
+    DocxReferenceModel:
+      title: DOCX document reference
+      description: Represents a reference to a part of a DOCX document.
+      type: object
+      properties:
+        type:
+          description: The type of reference. Always `doc_x`.
+          type: string
+        file:
+          $ref: '#/components/schemas/AssistantFileModel'
+        pages:
+          description: A list of page numbers in the DOCX document that are relevant to the query.
+          type: array
+          items:
+            type: integer
+      required:
+      - type
+      - file
+      - pages
+    UsageModel:
+      description: Describes the token usage associated with interactions with an assistant.
+      type: object
+      properties:
+        prompt_tokens:
+          description: |-
+            For chat interactions, the number of tokens in the LLM request (message, context snippets, and system prompt).
+            For context retrieval, the number of tokens in the LLM request used to generate search queries from the messages, plus the tokens in the retrieved context snippets.
+          type: integer
+        completion_tokens:
+          description: "For chat interactions, the number of tokens in the assistant's response.  \nFor context retrieval, this is always 0."
+          type: integer
+        total_tokens:
+          description: The total number of tokens used, equal to the sum of `prompt_tokens` and `completion_tokens`.
+          type: integer
+    ChoiceChunkModel:
+      description: Describes a single choice in a chat completion response.
+      type: object
+      properties:
+        finish_reason:
+          description: "Indicates why the chat response generation stopped. This signals the end of the response.\n- `stop`: The model finished generating the response.  \n- `length`: Generation was cut off because the maximum number of tokens allowed was reached.\n- `content_filter`: Generation stopped because content was blocked by content filtering rules. \n  (for example, content that contains hate speech or violent material).\n\n- `tool_calls`: Generation stopped because a tool call was triggered."
+          x-enum:
+          - stop
+          - length
+          - content_filter
+          - tool_calls
+          type: string
+        index:
+          description: The index of this choice in the list of returned choices.
+          type: integer
+        delta:
+          description: Chat completion message
+          type: object
+          properties:
+            role:
+              description: The role of the message author, it can be `user`, `assistant`, or `system`.
+              type: string
+            content:
+              description: The textual content of this partial message.
+              type: string
+    ChatRequest:
+      description: Represents a request to chat with an assistant.
+      type: object
+      properties:
+        messages:
+          description: The list of messages sent to the assistant, used for context retrieval and generating response with the LLM.
+          type: array
+          items:
+            $ref: '#/components/schemas/MessageModel'
+        stream:
+          description: If `false`, the assistant returns a single JSON response. If `true`, the assistant returns a stream of responses.
+          default: false
+          type: boolean
+        model:
+          description: The large language model used to generate responses.
+          default: gpt-4o
+          x-enum:
+          - gpt-4o
+          - gpt-4.1
+          - gpt-5
+          - o4-mini
+          - claude-sonnet-4-5
+          - gemini-2.5-pro
+          type: string
+        temperature:
+          description: 'Controls the randomness of the model''s output: lower values make responses more deterministic, while higher values increase creativity and variability. If the model does not support a temperature parameter, the parameter will be ignored.'
+          default: 0.0
+          type: number
+          format: float
+        filter:
+          example:
+            genre:
+              $ne: documentary
+          description: Optional metadata-based filter to restrict which documents are retrieved for the assistant's response context.
+          type: object
+        json_response:
+          description: If `true`, instructs the assistant to return a JSON-formatted response. Cannot be used together with streaming mode.
+          default: false
+          type: boolean
+        include_highlights:
+          description: If `true`, instructs the assistant to include highlights from the referenced documents that support its response.
+          default: false
+          type: boolean
+        context_options:
+          $ref: '#/components/schemas/ContextOptionsModel'
+      required:
+      - messages
+    OperationList:
+      description: A list of operations.
+      type: object
+      properties:
+        operations:
+          description: The list of operations for the assistant.
+          type: array
+          items:
+            $ref: '#/components/schemas/OperationModel'
+        pagination:
+          $ref: '#/components/schemas/PaginationResponse'
+    MultiModalContentTextBlockModel:
+      title: Multimodal text content block
+      description: Represents a text block in a multimodal context snippet.
+      type: object
+      properties:
+        type:
+          description: The type of multimodal content block. Always `text`.
+          type: string
+        text:
+          description: The text content of this multimodal block.
+          type: string
+      required:
+      - type
+      - text
+    ListFilesResponse:
+      type: object
+      properties:
+        files:
+          description: The list of files that exist in the assistant.
+          type: array
+          items:
+            $ref: '#/components/schemas/AssistantFileModel'
+        pagination:
+          $ref: '#/components/schemas/PaginationResponse'
+    ReferenceModel:
+      description: Describes a single reference in a citation.
+      type: object
+      properties:
+        file:
+          $ref: '#/components/schemas/AssistantFileModel'
+        pages:
+          description: A list of page numbers in the referenced document that contain the relevant content.
+          type: array
+          items:
+            type: integer
+        highlight:
+          $ref: '#/components/schemas/HighlightModel'
+    PdfReferenceModel:
+      title: PDF document reference
+      description: Represents a reference to a part of a PDF document.
+      type: object
+      properties:
+        type:
+          description: The type of reference. Always `pdf`.
+          type: string
+        file:
+          $ref: '#/components/schemas/AssistantFileModel'
+        pages:
+          description: A list of page numbers in the PDF document that are relevant to the query.
+          type: array
+          items:
+            type: integer
+      required:
+      - type
+      - file
+      - pages
+    OperationModel:
+      description: The OperationModel describes the status of an ongoing or completed server operation.
+      type: object
+      properties:
+        id:
+          example: op-1234-abcd-5678
+          description: The unique identifier for the operation.
+          type: string
+        operation_type:
+          example: upload_file
+          description: The kind of action represented by this operation, such as uploading or deleting a file.
+          x-enum:
+          - upload_file
+          - upsert_file
+          - update_file_metadata
+          - delete_file
+          type: string
+        file_id:
+          nullable: true
+          example: my-file-id-123
+          description: The identifier of the file being operated on.
+          type: string
+        status:
+          example: Processing
+          description: |-
+            The status of the operation.
+
+            - `Processing`: The operation is in progress.
+            - `Completed`: The operation finished successfully.
+            - `Failed`: The operation failed. See `error_message` for details.
+          x-enum:
+          - Processing
+          - Completed
+          - Failed
+          type: string
+        created_on:
+          example: 2025-10-01T12:30:00Z
+          description: The timestamp when the operation was created, in ISO 8601 format.
+          type: string
+          format: date-time
+        completed_on:
+          nullable: true
+          example: 2025-10-01T12:35:00Z
+          description: The timestamp when the operation completed or failed, in ISO 8601 format. Present only when status is `Completed` or `Failed`.
+          type: string
+          format: date-time
+        percent_complete:
+          example: 42
+          description: The progress made by the operation, as a percentage (0-100).
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 100
+        error_message:
+          nullable: true
+          example: 'File processing failed: unsupported file format.'
+          description: |-
+            A message describing the error that caused the operation to fail.
+            Present only when status is `Failed`.
+          type: string
+      required:
+      - id
+      - operation_type
+      - status
+      - created_on
+    ContentChunkModel:
+      example:
+        delta:
+          content: Hello
+        id: 00000000000000002fe0c02e20be1c6a
+        model: gpt-4o-2024-11-20
+        type: content_chunk
+      title: Content stream chunk
+      description: A content chunk in a stream chat response that contains a partial segment of the assistant's response. The `delta.content` property provides a string fragment that should be appended to the previously received fragments to construct the complete message.
+      type: object
+      properties:
+        type:
+          description: The type of stream chunk. Always `content_chunk`.
+          type: string
+        id:
+          description: A unique identifier for this chat response.
+          type: string
+        model:
+          description: The name or identifier of the model used to generate this chat response.
+          type: string
+        delta:
+          description: The format of this partial message. For example, if the response is "Hello world", the first chunk's `delta.content` might contain "Hello" and the second chunk's `delta.content` might contain " world".
+          type: object
+          properties:
+            content:
+              description: The text content of this partial message.
+              type: string
+          required:
+          - content
+        content_filter_results:
+          $ref: '#/components/schemas/ContentFilterResults'
+      required:
+      - type
+      - id
+      - model
+      - delta
+    SnippetModel:
+      description: Represents a part of a document that is relevant to the user query.
+      discriminator:
+        propertyName: type
+        mapping:
+          text: '#/components/schemas/TextSnippetModel'
+          multimodal: '#/components/schemas/MultiModalSnippetModel'
+      type: object
+      oneOf:
+      - $ref: '#/components/schemas/TextSnippetModel'
+      - $ref: '#/components/schemas/MultiModalSnippetModel'
+    CitationChunkModel:
+      example:
+        citation:
+          position: 53
+          references:
+          - file:
+              created_on: 2025-01-01T00:00:00Z
+              error_message: null
+              id: ae79e447-b89e-4994-994b-3232ca52a654
+              metadata: null
+              multimodal: false
+              name: my_file.pdf
+              percent_done: 1.0
+              signed_url: https://storage.googleapis.com/...
+              size: 25000
+              status: Available
+              updated_on: 2025-01-01T00:01:00Z
+            pages:
+            - 1
+            - 2
+        id: 00000000000000002fe0c02e20be1c6a
+        model: gpt-4o-2024-11-20
+        type: citation
+      title: Citation stream chunk
+      description: A citation chunk in a stream chat response that identifies the documents  used to justify a specific claim or section of the assistant's response.  It maps a character offset (`position`) within the accumulated message  to specific references, allowing the client to render footnotes or  links at the exact point of the claim to ensure the response is  grounded in the provided files.
+      type: object
+      properties:
+        type:
+          description: The type of stream chunk. Always `citation`.
+          type: string
+        id:
+          description: A unique identifier for this chat response.
+          type: string
+        model:
+          description: The name or identifier of the model used to generate this chat response.
+          type: string
+        citation:
+          $ref: '#/components/schemas/CitationModel'
+      required:
+      - type
+      - id
+      - model
+      - citation
+    SearchCompletions:
+      description: Represents a request to chat with an assistant.
+      type: object
+      properties:
+        messages:
+          description: The list of messages sent to the assistant, used for context retrieval and generating response with the LLM.
+          type: array
+          items:
+            $ref: '#/components/schemas/MessageModel'
+        stream:
+          description: If `false`, the assistant returns a single JSON response. If `true`, the assistant returns a stream of responses.
+          default: false
+          type: boolean
+        model:
+          description: The large language model used to generate responses.
+          default: gpt-4o
+          x-enum:
+          - gpt-4o
+          - gpt-4.1
+          - o4-mini
+          - claude-sonnet-4-5
+          - gemini-2.5-pro
+          type: string
+        temperature:
+          description: 'Controls the randomness of the model''s output: lower values make responses more deterministic, while higher values increase creativity and variability. If the model does not support a temperature parameter, the parameter will be ignored.'
+          default: 0.0
+          type: number
+          format: float
+        filter:
+          example:
+            genre:
+              $ne: documentary
+          description: Optional metadata-based filter to restrict which documents are retrieved for the assistant's response context.
+          type: object
+      required:
+      - messages
+    ImageModel:
+      nullable: true
+      description: Represents the data for an image.
+      type: object
+      properties:
+        type:
+          description: The format of the image data. Only `base64` is supported.
+          type: string
+        mime_type:
+          description: The MIME type of the image (e.g., `image/jpeg`).
+          type: string
+        data:
+          description: The image data. When `type` is `base64`, this is a base64-encoded string.
+          type: string
+      required:
+      - type
+      - mime_type
+      - data
+    TextReferenceModel:
+      title: Text document reference
+      description: Represents a reference to a part of a text document.
+      type: object
+      properties:
+        type:
+          description: The type of reference. Always `text`.
+          type: string
+        file:
+          $ref: '#/components/schemas/AssistantFileModel'
+      required:
+      - type
+      - file
+    TextSnippetModel:
+      title: Text context snippet
+      description: Represents a text context snippet.
+      type: object
+      properties:
+        type:
+          description: The type of context snippet. Always `text`.
+          type: string
+        content:
+          description: The textual content of the snippet.
+          type: string
+        score:
+          description: A numerical score indicating the relevance of this snippet to the query.
+          type: number
+          format: float
+        reference:
+          $ref: '#/components/schemas/TypedReferenceModel'
+      required:
+      - type
+      - content
+      - score
+      - reference
+    ChatCompletionModel:
+      description: Describes the response format of a chat request.
+      type: object
+      properties:
+        id:
+          description: A unique identifier for this chat response.
+          type: string
+        choices:
+          description: A list of chat completion choices.
+          type: array
+          items:
+            $ref: '#/components/schemas/ChoiceModel'
+        model:
+          description: The name or identifier of the model used to generate this chat response.
+          type: string
+        usage:
+          $ref: '#/components/schemas/UsageModel'
+    AssistantFileModel:
+      description: The response format for a successful file upload request.
+      type: object
+      properties:
+        name:
+          description: The name of the uploaded file.
+          type: string
+        id:
+          description: The unique identifier for the uploaded file. This may be a user-provided identifier or a system-generated ID.
+          type: string
+        size:
+          example: 1048576
+          description: The size of the uploaded file, in bytes.
+          type: integer
+          format: int64
+        metadata:
+          nullable: true
+          example:
+            created_by: Jane Doe
+            published: 2025-10-01
+            tags:
+            - report
+            - Q4
+            - analytics
+          description: Optional metadata associated with the file. This metadata can be used to filter files when listing them or to restrict search results when querying the assistant.
+          type: object
+        created_on:
+          example: 2025-10-01T12:30:00Z
+          description: The timestamp when the file was uploaded, in ISO 8601 format (`YYYY-MM-DDTHH:MM:SSZ`).
+          type: string
+          format: date-time
+        updated_on:
+          example: 2025-10-01T12:45:00Z
+          description: The timestamp of the most recent update to the file, in ISO 8601 format (`YYYY-MM-DDTHH:MM:SSZ`).
+          type: string
+          format: date-time
+        status:
+          description: |-
+            The current state of the uploaded file. Possible values:
+            - `Processing`: File is being processed (parsed, chunked, embedded)
+            - `Available`: Processing completed successfully; file is ready for use
+            - `Deleting`: Deletion has been initiated but not yet completed
+            - `ProcessingFailed`: Processing failed with an error
+
+            Note: Once a file is deleted, the API returns 404 Not Found instead of a file object.
+          x-enum:
+          - Processing
+          - Available
+          - Deleting
+          - ProcessingFailed
+          type: string
+        signed_url:
+          nullable: true
+          example: https://storage.googleapis.com/bucket/file.pdf?...
+          description: A [signed URL](https://cloud.google.com/storage/docs/access-control/signed-urls) that provides temporary, read-only access to the file.  Anyone with the link can access the file, so treat it as sensitive data. Expires after a short time.
+          type: string
+        multimodal:
+          description: Indicates whether the file was processed as multimodal.
+          type: boolean
+      required:
+      - id
+      - name
+    StreamChatChunkModel:
+      description: Represents a chunk of a stream chat response.
+      discriminator:
+        propertyName: type
+        mapping:
+          message_start: '#/components/schemas/MessageStartModel'
+          content_chunk: '#/components/schemas/ContentChunkModel'
+          citation: '#/components/schemas/CitationChunkModel'
+          message_end: '#/components/schemas/MessageEndModel'
+      type: object
+      oneOf:
+      - $ref: '#/components/schemas/MessageStartModel'
+      - $ref: '#/components/schemas/ContentChunkModel'
+      - $ref: '#/components/schemas/CitationChunkModel'
+      - $ref: '#/components/schemas/MessageEndModel'
+    ChatModel:
+      description: Describes the response format of a chat request.
+      type: object
+      properties:
+        id:
+          description: A unique identifier for this chat response.
+          type: string
+        finish_reason:
+          description: "Indicates why the chat response generation stopped. This signals the end of the response.\n- `stop`: The model finished generating the response.  \n- `length`: Generation was cut off because the maximum number of tokens allowed was reached.\n- `content_filter`: Generation stopped because content was blocked by content filtering rules. \n  (for example, content that contains hate speech or violent material).\n\n- `tool_calls`: Generation stopped because a tool call was triggered."
+          x-enum:
+          - stop
+          - length
+          - content_filter
+          - tool_calls
+          type: string
+        message:
+          $ref: '#/components/schemas/MessageModel'
+        model:
+          description: The name or identifier of the model used to generate this chat response.
+          type: string
+        citations:
+          description: Citations supporting the information in the response.
+          type: array
+          items:
+            $ref: '#/components/schemas/CitationModel'
+        usage:
+          $ref: '#/components/schemas/UsageModel'
+        context_snippet_count:
+          description: The number of context snippets provided to the model to generate the response. This indicates how much retrieved information was available for the  generation, allowing for logic to be applied if no context was found (count is 0).
+          type: integer
+        content_filter_results:
+          $ref: '#/components/schemas/ContentFilterResults'
+    FileData:
+      type: object
+      properties:
+        file:
+          description: The file to upload.
+          type: string
+          format: binary
+        metadata:
+          nullable: true
+          example:
+            created_by: Jane Doe
+            published: 2025-10-01
+            tags:
+            - report
+            - Q4
+            - analytics
+          description: Optional metadata associated with the file. This metadata can be used to filter files when listing them or to restrict search results when querying the assistant. Maximum size is 16KB.
+          type: object
+      required:
+      - file
+    ContextOptionsModel:
+      description: Controls the context snippets sent to the LLM.
+      type: object
+      properties:
+        top_k:
+          example: 20
+          description: The maximum number of context snippets to use. Default is 16. Maximum is 64.
+          type: integer
+        snippet_size:
+          example: 4096
+          description: The maximum context snippet size. Default is 2048 tokens. Minimum is 512 tokens. Maximum is 8192 tokens.
+          type: integer
+        multimodal:
+          description: Whether or not to send image-related context snippets to the LLM. If `false`, only text context snippets are sent.
+          default: true
+          type: boolean
+        include_binary_content:
+          description: If image-related context snippets are sent to the LLM, this field determines whether or not they should include base64 image data. If `false`, only the image caption is sent. Only available when `multimodal=true`.
+          default: true
+          type: boolean
+    PaginationResponse:
+      example:
+        next: dXNlcl9pZD11c2VyXzE=
+      description: Object that contains the next pagination token to continue a previous listing operation.
+      type: object
+      properties:
+        next:
+          description: The token to use to retrieve the next page of results.
+          type: string
+      required:
+      - next
+    HighlightModel:
+      nullable: true
+      description: Represents a portion of a referenced document that directly supports or is relevant to the response.
+      type: object
+      properties:
+        type:
+          description: The type of the highlight. Only `text` is supported.
+          type: string
+        content:
+          description: The text content of the highlighted portion from the referenced document.
+          type: string
+      required:
+      - type
+      - content
+    StreamChatCompletionChunkModel:
+      description: Describes the response format of a chat request.
+      type: object
+      properties:
+        id:
+          description: A unique identifier for this chat response.
+          type: string
+        choices:
+          description: A list of chat completion choices.
+          type: array
+          items:
+            $ref: '#/components/schemas/ChoiceChunkModel'
+        model:
+          description: The name or identifier of the model used to generate this chat response.
+          type: string
+    ContextRequest:
+      description: Parameters to retrieve context from an assistant.
+      type: object
+      properties:
+        query:
+          description: The query that is used to generate the context. Exactly one of query or messages should be provided.
+          type: string
+        filter:
+          example:
+            genre:
+              $ne: documentary
+          description: Optionally filter which documents can be retrieved using the following metadata fields.
+          type: object
+        messages:
+          description: The list of messages to use for generating the context. Exactly one of query or messages should be provided.
+          type: array
+          items:
+            $ref: '#/components/schemas/MessageModel'
+        top_k:
+          example: 20
+          description: The maximum number of context snippets to return. Default is 16. Maximum is 64.
+          type: integer
+        snippet_size:
+          example: 4096
+          description: The maximum context snippet size. Default is 2048 tokens. Minimum is 512 tokens. Maximum is 8192 tokens.
+          type: integer
+        multimodal:
+          description: Whether or not to retrieve image-related context snippets. If `false`, only text snippets are returned.
+          default: true
+          type: boolean
+        include_binary_content:
+          description: If image-related context snippets are returned, this field determines whether or not they should include base64 image data. If `false`, only the image captions are returned. Only available when `multimodal=true`.
+          default: true
+          type: boolean
+    TypedReferenceModel:
+      description: Represents a reference for the information provided.
+      discriminator:
+        propertyName: type
+        mapping:
+          text: '#/components/schemas/TextReferenceModel'
+          json: '#/components/schemas/JsonReferenceModel'
+          markdown: '#/components/schemas/MarkdownReferenceModel'
+          pdf: '#/components/schemas/PdfReferenceModel'
+          doc_x: '#/components/schemas/DocxReferenceModel'
+      type: object
+      oneOf:
+      - $ref: '#/components/schemas/TextReferenceModel'
+      - $ref: '#/components/schemas/JsonReferenceModel'
+      - $ref: '#/components/schemas/MarkdownReferenceModel'
+      - $ref: '#/components/schemas/PdfReferenceModel'
+      - $ref: '#/components/schemas/DocxReferenceModel'
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: Api-Key
+      description: Pinecone API Key
+security:
+- ApiKeyAuth: []
+tags:
+- name: Manage Assistants
+  description: Actions that manage Assistants
