@@ -1093,714 +1093,6 @@ paths:
                     status: 500
 components:
   schemas:
-    MessageEndModel:
-      example:
-        finish_reason: stop
-        id: 00000000000000002fe0c02e20be1c6a
-        model: gpt-4o-2024-11-20
-        type: message_end
-        usage:
-          completion_tokens: 135
-          prompt_tokens: 2506
-          total_tokens: 2641
-      title: Message end stream chunk
-      description: The end message in a stream chat response. This chunk signals that the  assistant has finished sending the response and provides the reason  generation stopped along with the token consumption for the interaction.
-      type: object
-      properties:
-        type:
-          description: The type of stream chunk. Always `message_end`.
-          type: string
-        id:
-          description: A unique identifier for this chat response.
-          type: string
-        model:
-          description: The name or identifier of the model used to generate this chat response.
-          type: string
-        finish_reason:
-          description: "Indicates why the chat response generation stopped. This signals the  end of the stream and no further chunks will be sent for this response.\n- `stop`: The model finished generating the response.  \n- `length`: Generation was cut off because the maximum number of tokens allowed was reached.\n- `content_filter`: Generation stopped because content was blocked by content filtering rules. \n  (for example, content that contains hate speech or violent material).\n\n- `tool_calls`: Generation stopped because a tool call was triggered."
-          x-enum:
-          - stop
-          - length
-          - content_filter
-          - tool_calls
-          type: string
-        usage:
-          $ref: '#/components/schemas/UsageModel'
-        content_filter_results:
-          $ref: '#/components/schemas/ContentFilterResults'
-      required:
-      - type
-      - id
-      - model
-      - finish_reason
-    MarkdownReferenceModel:
-      title: Markdown document reference
-      description: Represents a reference to a part of a markdown document.
-      type: object
-      properties:
-        type:
-          description: The type of reference. Always `markdown`.
-          type: string
-        file:
-          $ref: '#/components/schemas/AssistantFileModel'
-      required:
-      - type
-      - file
-    MultiModalSnippetModel:
-      title: Multimodal context snippet
-      description: Represents a multimodal context snippet.
-      type: object
-      properties:
-        type:
-          description: The type of context snippet. Always `multimodal`.
-          type: string
-        content:
-          description: A list of multimodal content blocks (text, images, etc.) included in this snippet.
-          type: array
-          items:
-            $ref: '#/components/schemas/MultiModalContentBlocksModel'
-        score:
-          description: A numerical score indicating the relevance of this snippet to the user's query.
-          type: number
-          format: float
-        reference:
-          $ref: '#/components/schemas/TypedReferenceModel'
-      required:
-      - type
-      - content
-      - score
-      - reference
-    MessageStartModel:
-      example:
-        context_snippet_count: 16
-        id: 00000000000000002fe0c02e20be1c6a
-        model: gpt-4o-2024-11-20
-        role: assistant
-        type: message_start
-      title: Message start stream chunk
-      description: The start message of a stream chat response. This chunk initializes the  response by providing the unique identifier, the model, and the role  of the author. It also provides the count of retrieved context snippets  available to the model before any content is sent, allowing for  decisions on how to handle cases where no relevant context was found.
-      type: object
-      properties:
-        type:
-          description: The type of stream chunk. Always `message_start`.
-          type: string
-        id:
-          description: A unique identifier for this chat response.
-          type: string
-        model:
-          description: The name or identifier of the model used to generate this chat response.
-          type: string
-        role:
-          description: The role of the message author, it can be `user`, `assistant`, or `system`.
-          type: string
-        context_snippet_count:
-          description: The number of context snippets provided to the model to generate the response. This indicates how much retrieved information was available for the  generation, allowing for logic to be applied if no context was found (count is 0).
-          type: integer
-        content_filter_results:
-          $ref: '#/components/schemas/ContentFilterResults'
-      required:
-      - type
-      - id
-      - model
-      - role
-    MultiModalContentImageBlockModel:
-      title: Multimodal image content block
-      description: Represents an image block in a multimodal context snippet.
-      type: object
-      properties:
-        type:
-          description: The type of multimodal content block. Always `image`.
-          type: string
-        caption:
-          description: A caption describing the image.
-          type: string
-        image:
-          $ref: '#/components/schemas/ImageModel'
-      required:
-      - type
-      - caption
-    ContextModel:
-      description: Describes the context returned by an assistant in response to a query.
-      type: object
-      properties:
-        id:
-          description: A unique identifier for this context response.
-          type: string
-        snippets:
-          description: A list of context snippets relevant to the user's query.
-          type: array
-          items:
-            $ref: '#/components/schemas/SnippetModel'
-        usage:
-          $ref: '#/components/schemas/UsageModel'
-      required:
-      - snippets
-      - usage
-    ChoiceModel:
-      description: Describes a single choice in a chat completion response.
-      type: object
-      properties:
-        finish_reason:
-          description: "Indicates why the chat response generation stopped. This signals the end of the response.\n- `stop`: The model finished generating the response.  \n- `length`: Generation was cut off because the maximum number of tokens allowed was reached.\n- `content_filter`: Generation stopped because content was blocked by content filtering rules. \n  (for example, content that contains hate speech or violent material).\n\n- `tool_calls`: Generation stopped because a tool call was triggered."
-          x-enum:
-          - stop
-          - length
-          - content_filter
-          - tool_calls
-          type: string
-        index:
-          description: The index of this choice in the list of returned choices.
-          type: integer
-        message:
-          $ref: '#/components/schemas/MessageModel'
-    CitationModel:
-      description: Describes a single citation included in a chat response, pointing to one or more referenced sources.
-      type: object
-      properties:
-        position:
-          description: The index position of the citation in the complete text response.
-          type: integer
-        references:
-          description: A list of file references that this citation points to.
-          type: array
-          items:
-            $ref: '#/components/schemas/ReferenceModel'
-    MessageModel:
-      description: Describes the format of a message in a chat.
-      type: object
-      properties:
-        role:
-          description: The role of the message author, it can be `user`, `assistant`, or `system`.
-          type: string
-        content:
-          description: The textual content of this partial message.
-          type: string
-    MultiModalContentBlocksModel:
-      description: Represents a block in the multimodal content of a context snippet.
-      discriminator:
-        propertyName: type
-        mapping:
-          text: '#/components/schemas/MultiModalContentTextBlockModel'
-          image: '#/components/schemas/MultiModalContentImageBlockModel'
-      type: object
-      oneOf:
-      - $ref: '#/components/schemas/MultiModalContentTextBlockModel'
-      - $ref: '#/components/schemas/MultiModalContentImageBlockModel'
-    ContentFilterResults:
-      description: Content filter results provided by the LLM, describing safety-related classifications applied to the content. The structure may vary depending on the model and the content being filtered. The `spec` field identifies the provider, and determines the structure of `results`.
-      type: object
-      properties:
-        spec:
-          description: Identifier of the model provider.
-          x-enum:
-          - openai
-          - gemini
-          type: string
-        results:
-          description: Content filter results returned by the provider. The structure depend on the `spec` value.
-    ErrorResponse:
-      example:
-        error:
-          code: TOO_MANY_REQUESTS
-          message: Too many get or list assistant requests, try again later
-        status: 429
-      description: The response shape used for all error responses.
-      type: object
-      properties:
-        status:
-          example: 500
-          description: The HTTP status code of the error.
-          type: integer
-        error:
-          example:
-            code: INVALID_ARGUMENT
-            message: 'Invalid region: Valid options are us, eu'
-          description: Detailed information about the error that occurred.
-          type: object
-          properties:
-            code:
-              description: The status code associated with the error.
-              x-enum:
-              - OK
-              - UNKNOWN
-              - INVALID_ARGUMENT
-              - DEADLINE_EXCEEDED
-              - QUOTA_EXCEEDED
-              - NOT_FOUND
-              - ALREADY_EXISTS
-              - PERMISSION_DENIED
-              - UNAUTHENTICATED
-              - RESOURCE_EXHAUSTED
-              - FAILED_PRECONDITION
-              - ABORTED
-              - OUT_OF_RANGE
-              - UNIMPLEMENTED
-              - INTERNAL
-              - UNAVAILABLE
-              - DATA_LOSS
-              - FORBIDDEN
-              - TOO_MANY_REQUESTS
-              type: string
-            message:
-              example: Message content cannot be empty
-              description: A message providing details about the error.
-              type: string
-            details:
-              description: Additional information about the error. This field is not guaranteed to be present.
-              type: object
-          required:
-          - code
-          - message
-      required:
-      - status
-      - error
-    JsonReferenceModel:
-      title: JSON document reference
-      description: Represents a reference to a JSON document.
-      type: object
-      properties:
-        type:
-          description: The type of reference. Always `json`.
-          type: string
-        file:
-          $ref: '#/components/schemas/AssistantFileModel'
-      required:
-      - type
-      - file
-    DocxReferenceModel:
-      title: DOCX document reference
-      description: Represents a reference to a part of a DOCX document.
-      type: object
-      properties:
-        type:
-          description: The type of reference. Always `doc_x`.
-          type: string
-        file:
-          $ref: '#/components/schemas/AssistantFileModel'
-        pages:
-          description: A list of page numbers in the DOCX document that are relevant to the query.
-          type: array
-          items:
-            type: integer
-      required:
-      - type
-      - file
-      - pages
-    UsageModel:
-      description: Describes the token usage associated with interactions with an assistant.
-      type: object
-      properties:
-        prompt_tokens:
-          description: |-
-            For chat interactions, the number of tokens in the LLM request (message, context snippets, and system prompt).
-            For context retrieval, the number of tokens in the LLM request used to generate search queries from the messages, plus the tokens in the retrieved context snippets.
-          type: integer
-        completion_tokens:
-          description: "For chat interactions, the number of tokens in the assistant's response.  \nFor context retrieval, this is always 0."
-          type: integer
-        total_tokens:
-          description: The total number of tokens used, equal to the sum of `prompt_tokens` and `completion_tokens`.
-          type: integer
-    ChoiceChunkModel:
-      description: Describes a single choice in a chat completion response.
-      type: object
-      properties:
-        finish_reason:
-          description: "Indicates why the chat response generation stopped. This signals the end of the response.\n- `stop`: The model finished generating the response.  \n- `length`: Generation was cut off because the maximum number of tokens allowed was reached.\n- `content_filter`: Generation stopped because content was blocked by content filtering rules. \n  (for example, content that contains hate speech or violent material).\n\n- `tool_calls`: Generation stopped because a tool call was triggered."
-          x-enum:
-          - stop
-          - length
-          - content_filter
-          - tool_calls
-          type: string
-        index:
-          description: The index of this choice in the list of returned choices.
-          type: integer
-        delta:
-          description: Chat completion message
-          type: object
-          properties:
-            role:
-              description: The role of the message author, it can be `user`, `assistant`, or `system`.
-              type: string
-            content:
-              description: The textual content of this partial message.
-              type: string
-    ChatRequest:
-      description: Represents a request to chat with an assistant.
-      type: object
-      properties:
-        messages:
-          description: The list of messages sent to the assistant, used for context retrieval and generating response with the LLM.
-          type: array
-          items:
-            $ref: '#/components/schemas/MessageModel'
-        stream:
-          description: If `false`, the assistant returns a single JSON response. If `true`, the assistant returns a stream of responses.
-          default: false
-          type: boolean
-        model:
-          description: The large language model used to generate responses.
-          default: gpt-4o
-          x-enum:
-          - gpt-4o
-          - gpt-4.1
-          - gpt-5
-          - o4-mini
-          - claude-sonnet-4-5
-          - gemini-2.5-pro
-          type: string
-        temperature:
-          description: 'Controls the randomness of the model''s output: lower values make responses more deterministic, while higher values increase creativity and variability. If the model does not support a temperature parameter, the parameter will be ignored.'
-          default: 0.0
-          type: number
-          format: float
-        filter:
-          example:
-            genre:
-              $ne: documentary
-          description: Optional metadata-based filter to restrict which documents are retrieved for the assistant's response context.
-          type: object
-        json_response:
-          description: If `true`, instructs the assistant to return a JSON-formatted response. Cannot be used together with streaming mode.
-          default: false
-          type: boolean
-        include_highlights:
-          description: If `true`, instructs the assistant to include highlights from the referenced documents that support its response.
-          default: false
-          type: boolean
-        context_options:
-          $ref: '#/components/schemas/ContextOptionsModel'
-      required:
-      - messages
-    OperationList:
-      description: A list of operations.
-      type: object
-      properties:
-        operations:
-          description: The list of operations for the assistant.
-          type: array
-          items:
-            $ref: '#/components/schemas/OperationModel'
-        pagination:
-          $ref: '#/components/schemas/PaginationResponse'
-    MultiModalContentTextBlockModel:
-      title: Multimodal text content block
-      description: Represents a text block in a multimodal context snippet.
-      type: object
-      properties:
-        type:
-          description: The type of multimodal content block. Always `text`.
-          type: string
-        text:
-          description: The text content of this multimodal block.
-          type: string
-      required:
-      - type
-      - text
-    ListFilesResponse:
-      type: object
-      properties:
-        files:
-          description: The list of files that exist in the assistant.
-          type: array
-          items:
-            $ref: '#/components/schemas/AssistantFileModel'
-        pagination:
-          $ref: '#/components/schemas/PaginationResponse'
-    ReferenceModel:
-      description: Describes a single reference in a citation.
-      type: object
-      properties:
-        file:
-          $ref: '#/components/schemas/AssistantFileModel'
-        pages:
-          description: A list of page numbers in the referenced document that contain the relevant content.
-          type: array
-          items:
-            type: integer
-        highlight:
-          $ref: '#/components/schemas/HighlightModel'
-    PdfReferenceModel:
-      title: PDF document reference
-      description: Represents a reference to a part of a PDF document.
-      type: object
-      properties:
-        type:
-          description: The type of reference. Always `pdf`.
-          type: string
-        file:
-          $ref: '#/components/schemas/AssistantFileModel'
-        pages:
-          description: A list of page numbers in the PDF document that are relevant to the query.
-          type: array
-          items:
-            type: integer
-      required:
-      - type
-      - file
-      - pages
-    OperationModel:
-      description: The OperationModel describes the status of an ongoing or completed server operation.
-      type: object
-      properties:
-        id:
-          example: op-1234-abcd-5678
-          description: The unique identifier for the operation.
-          type: string
-        operation_type:
-          example: upload_file
-          description: The kind of action represented by this operation, such as uploading or deleting a file.
-          x-enum:
-          - upload_file
-          - upsert_file
-          - update_file_metadata
-          - delete_file
-          type: string
-        file_id:
-          nullable: true
-          example: my-file-id-123
-          description: The identifier of the file being operated on.
-          type: string
-        status:
-          example: Processing
-          description: |-
-            The status of the operation.
-
-            - `Processing`: The operation is in progress.
-            - `Completed`: The operation finished successfully.
-            - `Failed`: The operation failed. See `error_message` for details.
-          x-enum:
-          - Processing
-          - Completed
-          - Failed
-          type: string
-        created_on:
-          example: 2025-10-01T12:30:00Z
-          description: The timestamp when the operation was created, in ISO 8601 format.
-          type: string
-          format: date-time
-        completed_on:
-          nullable: true
-          example: 2025-10-01T12:35:00Z
-          description: The timestamp when the operation completed or failed, in ISO 8601 format. Present only when status is `Completed` or `Failed`.
-          type: string
-          format: date-time
-        percent_complete:
-          example: 42
-          description: The progress made by the operation, as a percentage (0-100).
-          type: integer
-          format: int32
-          minimum: 0
-          maximum: 100
-        error_message:
-          nullable: true
-          example: 'File processing failed: unsupported file format.'
-          description: |-
-            A message describing the error that caused the operation to fail.
-            Present only when status is `Failed`.
-          type: string
-      required:
-      - id
-      - operation_type
-      - status
-      - created_on
-    ContentChunkModel:
-      example:
-        delta:
-          content: Hello
-        id: 00000000000000002fe0c02e20be1c6a
-        model: gpt-4o-2024-11-20
-        type: content_chunk
-      title: Content stream chunk
-      description: A content chunk in a stream chat response that contains a partial segment of the assistant's response. The `delta.content` property provides a string fragment that should be appended to the previously received fragments to construct the complete message.
-      type: object
-      properties:
-        type:
-          description: The type of stream chunk. Always `content_chunk`.
-          type: string
-        id:
-          description: A unique identifier for this chat response.
-          type: string
-        model:
-          description: The name or identifier of the model used to generate this chat response.
-          type: string
-        delta:
-          description: The format of this partial message. For example, if the response is "Hello world", the first chunk's `delta.content` might contain "Hello" and the second chunk's `delta.content` might contain " world".
-          type: object
-          properties:
-            content:
-              description: The text content of this partial message.
-              type: string
-          required:
-          - content
-        content_filter_results:
-          $ref: '#/components/schemas/ContentFilterResults'
-      required:
-      - type
-      - id
-      - model
-      - delta
-    SnippetModel:
-      description: Represents a part of a document that is relevant to the user query.
-      discriminator:
-        propertyName: type
-        mapping:
-          text: '#/components/schemas/TextSnippetModel'
-          multimodal: '#/components/schemas/MultiModalSnippetModel'
-      type: object
-      oneOf:
-      - $ref: '#/components/schemas/TextSnippetModel'
-      - $ref: '#/components/schemas/MultiModalSnippetModel'
-    CitationChunkModel:
-      example:
-        citation:
-          position: 53
-          references:
-          - file:
-              created_on: 2025-01-01T00:00:00Z
-              error_message: null
-              id: ae79e447-b89e-4994-994b-3232ca52a654
-              metadata: null
-              multimodal: false
-              name: my_file.pdf
-              percent_done: 1.0
-              signed_url: https://storage.googleapis.com/...
-              size: 25000
-              status: Available
-              updated_on: 2025-01-01T00:01:00Z
-            pages:
-            - 1
-            - 2
-        id: 00000000000000002fe0c02e20be1c6a
-        model: gpt-4o-2024-11-20
-        type: citation
-      title: Citation stream chunk
-      description: A citation chunk in a stream chat response that identifies the documents  used to justify a specific claim or section of the assistant's response.  It maps a character offset (`position`) within the accumulated message  to specific references, allowing the client to render footnotes or  links at the exact point of the claim to ensure the response is  grounded in the provided files.
-      type: object
-      properties:
-        type:
-          description: The type of stream chunk. Always `citation`.
-          type: string
-        id:
-          description: A unique identifier for this chat response.
-          type: string
-        model:
-          description: The name or identifier of the model used to generate this chat response.
-          type: string
-        citation:
-          $ref: '#/components/schemas/CitationModel'
-      required:
-      - type
-      - id
-      - model
-      - citation
-    SearchCompletions:
-      description: Represents a request to chat with an assistant.
-      type: object
-      properties:
-        messages:
-          description: The list of messages sent to the assistant, used for context retrieval and generating response with the LLM.
-          type: array
-          items:
-            $ref: '#/components/schemas/MessageModel'
-        stream:
-          description: If `false`, the assistant returns a single JSON response. If `true`, the assistant returns a stream of responses.
-          default: false
-          type: boolean
-        model:
-          description: The large language model used to generate responses.
-          default: gpt-4o
-          x-enum:
-          - gpt-4o
-          - gpt-4.1
-          - o4-mini
-          - claude-sonnet-4-5
-          - gemini-2.5-pro
-          type: string
-        temperature:
-          description: 'Controls the randomness of the model''s output: lower values make responses more deterministic, while higher values increase creativity and variability. If the model does not support a temperature parameter, the parameter will be ignored.'
-          default: 0.0
-          type: number
-          format: float
-        filter:
-          example:
-            genre:
-              $ne: documentary
-          description: Optional metadata-based filter to restrict which documents are retrieved for the assistant's response context.
-          type: object
-      required:
-      - messages
-    ImageModel:
-      nullable: true
-      description: Represents the data for an image.
-      type: object
-      properties:
-        type:
-          description: The format of the image data. Only `base64` is supported.
-          type: string
-        mime_type:
-          description: The MIME type of the image (e.g., `image/jpeg`).
-          type: string
-        data:
-          description: The image data. When `type` is `base64`, this is a base64-encoded string.
-          type: string
-      required:
-      - type
-      - mime_type
-      - data
-    TextReferenceModel:
-      title: Text document reference
-      description: Represents a reference to a part of a text document.
-      type: object
-      properties:
-        type:
-          description: The type of reference. Always `text`.
-          type: string
-        file:
-          $ref: '#/components/schemas/AssistantFileModel'
-      required:
-      - type
-      - file
-    TextSnippetModel:
-      title: Text context snippet
-      description: Represents a text context snippet.
-      type: object
-      properties:
-        type:
-          description: The type of context snippet. Always `text`.
-          type: string
-        content:
-          description: The textual content of the snippet.
-          type: string
-        score:
-          description: A numerical score indicating the relevance of this snippet to the query.
-          type: number
-          format: float
-        reference:
-          $ref: '#/components/schemas/TypedReferenceModel'
-      required:
-      - type
-      - content
-      - score
-      - reference
-    ChatCompletionModel:
-      description: Describes the response format of a chat request.
-      type: object
-      properties:
-        id:
-          description: A unique identifier for this chat response.
-          type: string
-        choices:
-          description: A list of chat completion choices.
-          type: array
-          items:
-            $ref: '#/components/schemas/ChoiceModel'
-        model:
-          description: The name or identifier of the model used to generate this chat response.
-          type: string
-        usage:
-          $ref: '#/components/schemas/UsageModel'
     AssistantFileModel:
       description: The response format for a successful file upload request.
       type: object
@@ -1863,21 +1155,23 @@ components:
       required:
       - id
       - name
-    StreamChatChunkModel:
-      description: Represents a chunk of a stream chat response.
-      discriminator:
-        propertyName: type
-        mapping:
-          message_start: '#/components/schemas/MessageStartModel'
-          content_chunk: '#/components/schemas/ContentChunkModel'
-          citation: '#/components/schemas/CitationChunkModel'
-          message_end: '#/components/schemas/MessageEndModel'
+    ChatCompletionModel:
+      description: Describes the response format of a chat request.
       type: object
-      oneOf:
-      - $ref: '#/components/schemas/MessageStartModel'
-      - $ref: '#/components/schemas/ContentChunkModel'
-      - $ref: '#/components/schemas/CitationChunkModel'
-      - $ref: '#/components/schemas/MessageEndModel'
+      properties:
+        id:
+          description: A unique identifier for this chat response.
+          type: string
+        choices:
+          description: A list of chat completion choices.
+          type: array
+          items:
+            $ref: '#/components/schemas/ChoiceModel'
+        model:
+          description: The name or identifier of the model used to generate this chat response.
+          type: string
+        usage:
+          $ref: '#/components/schemas/UsageModel'
     ChatModel:
       description: Describes the response format of a chat request.
       type: object
@@ -1910,26 +1204,213 @@ components:
           type: integer
         content_filter_results:
           $ref: '#/components/schemas/ContentFilterResults'
-    FileData:
+    ChatRequest:
+      description: Represents a request to chat with an assistant.
       type: object
       properties:
-        file:
-          description: The file to upload.
+        messages:
+          description: The list of messages sent to the assistant, used for context retrieval and generating response with the LLM.
+          type: array
+          items:
+            $ref: '#/components/schemas/MessageModel'
+        stream:
+          description: If `false`, the assistant returns a single JSON response. If `true`, the assistant returns a stream of responses.
+          default: false
+          type: boolean
+        model:
+          description: The large language model used to generate responses.
+          default: gpt-4o
+          x-enum:
+          - gpt-4o
+          - gpt-4.1
+          - gpt-5
+          - o4-mini
+          - claude-sonnet-4-5
+          - gemini-2.5-pro
           type: string
-          format: binary
-        metadata:
-          nullable: true
+        temperature:
+          description: 'Controls the randomness of the model''s output: lower values make responses more deterministic, while higher values increase creativity and variability. If the model does not support a temperature parameter, the parameter will be ignored.'
+          default: 0.0
+          type: number
+          format: float
+        filter:
           example:
-            created_by: Jane Doe
-            published: 2025-10-01
-            tags:
-            - report
-            - Q4
-            - analytics
-          description: Optional metadata associated with the file. This metadata can be used to filter files when listing them or to restrict search results when querying the assistant. Maximum size is 16KB.
+            genre:
+              $ne: documentary
+          description: Optional metadata-based filter to restrict which documents are retrieved for the assistant's response context.
           type: object
+        json_response:
+          description: If `true`, instructs the assistant to return a JSON-formatted response. Cannot be used together with streaming mode.
+          default: false
+          type: boolean
+        include_highlights:
+          description: If `true`, instructs the assistant to include highlights from the referenced documents that support its response.
+          default: false
+          type: boolean
+        context_options:
+          $ref: '#/components/schemas/ContextOptionsModel'
       required:
-      - file
+      - messages
+    ChoiceChunkModel:
+      description: Describes a single choice in a chat completion response.
+      type: object
+      properties:
+        finish_reason:
+          description: "Indicates why the chat response generation stopped. This signals the end of the response.\n- `stop`: The model finished generating the response.  \n- `length`: Generation was cut off because the maximum number of tokens allowed was reached.\n- `content_filter`: Generation stopped because content was blocked by content filtering rules. \n  (for example, content that contains hate speech or violent material).\n\n- `tool_calls`: Generation stopped because a tool call was triggered."
+          x-enum:
+          - stop
+          - length
+          - content_filter
+          - tool_calls
+          type: string
+        index:
+          description: The index of this choice in the list of returned choices.
+          type: integer
+        delta:
+          description: Chat completion message
+          type: object
+          properties:
+            role:
+              description: The role of the message author, it can be `user`, `assistant`, or `system`.
+              type: string
+            content:
+              description: The textual content of this partial message.
+              type: string
+    ChoiceModel:
+      description: Describes a single choice in a chat completion response.
+      type: object
+      properties:
+        finish_reason:
+          description: "Indicates why the chat response generation stopped. This signals the end of the response.\n- `stop`: The model finished generating the response.  \n- `length`: Generation was cut off because the maximum number of tokens allowed was reached.\n- `content_filter`: Generation stopped because content was blocked by content filtering rules. \n  (for example, content that contains hate speech or violent material).\n\n- `tool_calls`: Generation stopped because a tool call was triggered."
+          x-enum:
+          - stop
+          - length
+          - content_filter
+          - tool_calls
+          type: string
+        index:
+          description: The index of this choice in the list of returned choices.
+          type: integer
+        message:
+          $ref: '#/components/schemas/MessageModel'
+    CitationChunkModel:
+      example:
+        citation:
+          position: 53
+          references:
+          - file:
+              created_on: 2025-01-01T00:00:00Z
+              id: ae79e447-b89e-4994-994b-3232ca52a654
+              metadata: null
+              multimodal: false
+              name: my_file.pdf
+              signed_url: https://storage.googleapis.com/...
+              size: 25000
+              status: Available
+              updated_on: 2025-01-01T00:01:00Z
+            pages:
+            - 1
+            - 2
+        id: 00000000000000002fe0c02e20be1c6a
+        model: gpt-4o-2024-11-20
+        type: citation
+      title: Citation stream chunk
+      description: A citation chunk in a stream chat response that identifies the documents  used to justify a specific claim or section of the assistant's response.  It maps a character offset (`position`) within the accumulated message  to specific references, allowing the client to render footnotes or  links at the exact point of the claim to ensure the response is  grounded in the provided files.
+      type: object
+      properties:
+        type:
+          description: The type of stream chunk. Always `citation`.
+          type: string
+        id:
+          description: A unique identifier for this chat response.
+          type: string
+        model:
+          description: The name or identifier of the model used to generate this chat response.
+          type: string
+        citation:
+          $ref: '#/components/schemas/CitationModel'
+      required:
+      - type
+      - id
+      - model
+      - citation
+    CitationModel:
+      description: Describes a single citation included in a chat response, pointing to one or more referenced sources.
+      type: object
+      properties:
+        position:
+          description: The index position of the citation in the complete text response.
+          type: integer
+        references:
+          description: A list of file references that this citation points to.
+          type: array
+          items:
+            $ref: '#/components/schemas/ReferenceModel'
+    ContentChunkModel:
+      example:
+        delta:
+          content: Hello
+        id: 00000000000000002fe0c02e20be1c6a
+        model: gpt-4o-2024-11-20
+        type: content_chunk
+      title: Content stream chunk
+      description: A content chunk in a stream chat response that contains a partial segment of the assistant's response. The `delta.content` property provides a string fragment that should be appended to the previously received fragments to construct the complete message.
+      type: object
+      properties:
+        type:
+          description: The type of stream chunk. Always `content_chunk`.
+          type: string
+        id:
+          description: A unique identifier for this chat response.
+          type: string
+        model:
+          description: The name or identifier of the model used to generate this chat response.
+          type: string
+        delta:
+          description: The format of this partial message. For example, if the response is "Hello world", the first chunk's `delta.content` might contain "Hello" and the second chunk's `delta.content` might contain " world".
+          type: object
+          properties:
+            content:
+              description: The text content of this partial message.
+              type: string
+          required:
+          - content
+        content_filter_results:
+          $ref: '#/components/schemas/ContentFilterResults'
+      required:
+      - type
+      - id
+      - model
+      - delta
+    ContentFilterResults:
+      description: Content filter results provided by the LLM, describing safety-related classifications applied to the content. The structure may vary depending on the model and the content being filtered. The `spec` field identifies the provider, and determines the structure of `results`.
+      type: object
+      properties:
+        spec:
+          description: Identifier of the model provider.
+          x-enum:
+          - openai
+          - gemini
+          type: string
+        results:
+          description: Content filter results returned by the provider. The structure depend on the `spec` value.
+    ContextModel:
+      description: Describes the context returned by an assistant in response to a query.
+      type: object
+      properties:
+        id:
+          description: A unique identifier for this context response.
+          type: string
+        snippets:
+          description: A list of context snippets relevant to the user's query.
+          type: array
+          items:
+            $ref: '#/components/schemas/SnippetModel'
+        usage:
+          $ref: '#/components/schemas/UsageModel'
+      required:
+      - snippets
+      - usage
     ContextOptionsModel:
       description: Controls the context snippets sent to the LLM.
       type: object
@@ -1950,46 +1431,6 @@ components:
           description: If image-related context snippets are sent to the LLM, this field determines whether or not they should include base64 image data. If `false`, only the image caption is sent. Only available when `multimodal=true`.
           default: true
           type: boolean
-    PaginationResponse:
-      example:
-        next: dXNlcl9pZD11c2VyXzE=
-      description: Object that contains the next pagination token to continue a previous listing operation.
-      type: object
-      properties:
-        next:
-          description: The token to use to retrieve the next page of results.
-          type: string
-      required:
-      - next
-    HighlightModel:
-      nullable: true
-      description: Represents a portion of a referenced document that directly supports or is relevant to the response.
-      type: object
-      properties:
-        type:
-          description: The type of the highlight. Only `text` is supported.
-          type: string
-        content:
-          description: The text content of the highlighted portion from the referenced document.
-          type: string
-      required:
-      - type
-      - content
-    StreamChatCompletionChunkModel:
-      description: Describes the response format of a chat request.
-      type: object
-      properties:
-        id:
-          description: A unique identifier for this chat response.
-          type: string
-        choices:
-          description: A list of chat completion choices.
-          type: array
-          items:
-            $ref: '#/components/schemas/ChoiceChunkModel'
-        model:
-          description: The name or identifier of the model used to generate this chat response.
-          type: string
     ContextRequest:
       description: Parameters to retrieve context from an assistant.
       type: object
@@ -2024,6 +1465,556 @@ components:
           description: If image-related context snippets are returned, this field determines whether or not they should include base64 image data. If `false`, only the image captions are returned. Only available when `multimodal=true`.
           default: true
           type: boolean
+    DocxReferenceModel:
+      title: DOCX document reference
+      description: Represents a reference to a part of a DOCX document.
+      type: object
+      properties:
+        type:
+          description: The type of reference. Always `doc_x`.
+          type: string
+        file:
+          $ref: '#/components/schemas/AssistantFileModel'
+        pages:
+          description: A list of page numbers in the DOCX document that are relevant to the query.
+          type: array
+          items:
+            type: integer
+      required:
+      - type
+      - file
+      - pages
+    ErrorResponse:
+      example:
+        error:
+          code: TOO_MANY_REQUESTS
+          message: Too many get or list assistant requests, try again later
+        status: 429
+      description: The response shape used for all error responses.
+      type: object
+      properties:
+        status:
+          example: 500
+          description: The HTTP status code of the error.
+          type: integer
+        error:
+          example:
+            code: INVALID_ARGUMENT
+            message: 'Invalid region: Valid options are us, eu'
+          description: Detailed information about the error that occurred.
+          type: object
+          properties:
+            code:
+              description: The status code associated with the error.
+              x-enum:
+              - OK
+              - UNKNOWN
+              - INVALID_ARGUMENT
+              - DEADLINE_EXCEEDED
+              - QUOTA_EXCEEDED
+              - NOT_FOUND
+              - ALREADY_EXISTS
+              - PERMISSION_DENIED
+              - UNAUTHENTICATED
+              - RESOURCE_EXHAUSTED
+              - FAILED_PRECONDITION
+              - ABORTED
+              - OUT_OF_RANGE
+              - UNIMPLEMENTED
+              - INTERNAL
+              - UNAVAILABLE
+              - DATA_LOSS
+              - FORBIDDEN
+              - TOO_MANY_REQUESTS
+              type: string
+            message:
+              example: Message content cannot be empty
+              description: A message providing details about the error.
+              type: string
+            details:
+              description: Additional information about the error. This field is not guaranteed to be present.
+              type: object
+          required:
+          - code
+          - message
+      required:
+      - status
+      - error
+    FileData:
+      type: object
+      properties:
+        file:
+          description: The file to upload.
+          type: string
+          format: binary
+        metadata:
+          nullable: true
+          example:
+            created_by: Jane Doe
+            published: 2025-10-01
+            tags:
+            - report
+            - Q4
+            - analytics
+          description: Optional metadata associated with the file. This metadata can be used to filter files when listing them or to restrict search results when querying the assistant. Maximum size is 16KB.
+          type: object
+      required:
+      - file
+    HighlightModel:
+      nullable: true
+      description: Represents a portion of a referenced document that directly supports or is relevant to the response.
+      type: object
+      properties:
+        type:
+          description: The type of the highlight. Only `text` is supported.
+          type: string
+        content:
+          description: The text content of the highlighted portion from the referenced document.
+          type: string
+      required:
+      - type
+      - content
+    ImageModel:
+      nullable: true
+      description: Represents the data for an image.
+      type: object
+      properties:
+        type:
+          description: The format of the image data. Only `base64` is supported.
+          type: string
+        mime_type:
+          description: The MIME type of the image (e.g., `image/jpeg`).
+          type: string
+        data:
+          description: The image data. When `type` is `base64`, this is a base64-encoded string.
+          type: string
+      required:
+      - type
+      - mime_type
+      - data
+    JsonReferenceModel:
+      title: JSON document reference
+      description: Represents a reference to a JSON document.
+      type: object
+      properties:
+        type:
+          description: The type of reference. Always `json`.
+          type: string
+        file:
+          $ref: '#/components/schemas/AssistantFileModel'
+      required:
+      - type
+      - file
+    ListFilesResponse:
+      type: object
+      properties:
+        files:
+          description: The list of files that exist in the assistant.
+          type: array
+          items:
+            $ref: '#/components/schemas/AssistantFileModel'
+        pagination:
+          $ref: '#/components/schemas/PaginationResponse'
+    MarkdownReferenceModel:
+      title: Markdown document reference
+      description: Represents a reference to a part of a markdown document.
+      type: object
+      properties:
+        type:
+          description: The type of reference. Always `markdown`.
+          type: string
+        file:
+          $ref: '#/components/schemas/AssistantFileModel'
+      required:
+      - type
+      - file
+    MessageEndModel:
+      example:
+        finish_reason: stop
+        id: 00000000000000002fe0c02e20be1c6a
+        model: gpt-4o-2024-11-20
+        type: message_end
+        usage:
+          completion_tokens: 135
+          prompt_tokens: 2506
+          total_tokens: 2641
+      title: Message end stream chunk
+      description: The end message in a stream chat response. This chunk signals that the  assistant has finished sending the response and provides the reason  generation stopped along with the token consumption for the interaction.
+      type: object
+      properties:
+        type:
+          description: The type of stream chunk. Always `message_end`.
+          type: string
+        id:
+          description: A unique identifier for this chat response.
+          type: string
+        model:
+          description: The name or identifier of the model used to generate this chat response.
+          type: string
+        finish_reason:
+          description: "Indicates why the chat response generation stopped. This signals the  end of the stream and no further chunks will be sent for this response.\n- `stop`: The model finished generating the response.  \n- `length`: Generation was cut off because the maximum number of tokens allowed was reached.\n- `content_filter`: Generation stopped because content was blocked by content filtering rules. \n  (for example, content that contains hate speech or violent material).\n\n- `tool_calls`: Generation stopped because a tool call was triggered."
+          x-enum:
+          - stop
+          - length
+          - content_filter
+          - tool_calls
+          type: string
+        usage:
+          $ref: '#/components/schemas/UsageModel'
+        content_filter_results:
+          $ref: '#/components/schemas/ContentFilterResults'
+      required:
+      - type
+      - id
+      - model
+      - finish_reason
+    MessageModel:
+      description: Describes the format of a message in a chat.
+      type: object
+      properties:
+        role:
+          description: The role of the message author, it can be `user`, `assistant`, or `system`.
+          type: string
+        content:
+          description: The textual content of this partial message.
+          type: string
+    MessageStartModel:
+      example:
+        context_snippet_count: 16
+        id: 00000000000000002fe0c02e20be1c6a
+        model: gpt-4o-2024-11-20
+        role: assistant
+        type: message_start
+      title: Message start stream chunk
+      description: The start message of a stream chat response. This chunk initializes the  response by providing the unique identifier, the model, and the role  of the author. It also provides the count of retrieved context snippets  available to the model before any content is sent, allowing for  decisions on how to handle cases where no relevant context was found.
+      type: object
+      properties:
+        type:
+          description: The type of stream chunk. Always `message_start`.
+          type: string
+        id:
+          description: A unique identifier for this chat response.
+          type: string
+        model:
+          description: The name or identifier of the model used to generate this chat response.
+          type: string
+        role:
+          description: The role of the message author, it can be `user`, `assistant`, or `system`.
+          type: string
+        context_snippet_count:
+          description: The number of context snippets provided to the model to generate the response. This indicates how much retrieved information was available for the  generation, allowing for logic to be applied if no context was found (count is 0).
+          type: integer
+        content_filter_results:
+          $ref: '#/components/schemas/ContentFilterResults'
+      required:
+      - type
+      - id
+      - model
+      - role
+    MultiModalContentBlocksModel:
+      description: Represents a block in the multimodal content of a context snippet.
+      discriminator:
+        propertyName: type
+        mapping:
+          text: '#/components/schemas/MultiModalContentTextBlockModel'
+          image: '#/components/schemas/MultiModalContentImageBlockModel'
+      type: object
+      oneOf:
+      - $ref: '#/components/schemas/MultiModalContentTextBlockModel'
+      - $ref: '#/components/schemas/MultiModalContentImageBlockModel'
+    MultiModalContentImageBlockModel:
+      title: Multimodal image content block
+      description: Represents an image block in a multimodal context snippet.
+      type: object
+      properties:
+        type:
+          description: The type of multimodal content block. Always `image`.
+          type: string
+        caption:
+          description: A caption describing the image.
+          type: string
+        image:
+          $ref: '#/components/schemas/ImageModel'
+      required:
+      - type
+      - caption
+    MultiModalContentTextBlockModel:
+      title: Multimodal text content block
+      description: Represents a text block in a multimodal context snippet.
+      type: object
+      properties:
+        type:
+          description: The type of multimodal content block. Always `text`.
+          type: string
+        text:
+          description: The text content of this multimodal block.
+          type: string
+      required:
+      - type
+      - text
+    MultiModalSnippetModel:
+      title: Multimodal context snippet
+      description: Represents a multimodal context snippet.
+      type: object
+      properties:
+        type:
+          description: The type of context snippet. Always `multimodal`.
+          type: string
+        content:
+          description: A list of multimodal content blocks (text, images, etc.) included in this snippet.
+          type: array
+          items:
+            $ref: '#/components/schemas/MultiModalContentBlocksModel'
+        score:
+          description: A numerical score indicating the relevance of this snippet to the user's query.
+          type: number
+          format: float
+        reference:
+          $ref: '#/components/schemas/TypedReferenceModel'
+      required:
+      - type
+      - content
+      - score
+      - reference
+    OperationList:
+      description: A list of operations.
+      type: object
+      properties:
+        operations:
+          description: The list of operations for the assistant.
+          type: array
+          items:
+            $ref: '#/components/schemas/OperationModel'
+        pagination:
+          $ref: '#/components/schemas/PaginationResponse'
+    OperationModel:
+      description: The OperationModel describes the status of an ongoing or completed server operation.
+      type: object
+      properties:
+        id:
+          example: op-1234-abcd-5678
+          description: The unique identifier for the operation.
+          type: string
+        operation_type:
+          example: upload_file
+          description: The kind of action represented by this operation, such as uploading or deleting a file.
+          x-enum:
+          - upload_file
+          - upsert_file
+          - update_file_metadata
+          - delete_file
+          type: string
+        file_id:
+          nullable: true
+          example: my-file-id-123
+          description: The identifier of the file being operated on.
+          type: string
+        status:
+          example: Processing
+          description: |-
+            The status of the operation.
+
+            - `Processing`: The operation is in progress.
+            - `Completed`: The operation finished successfully.
+            - `Failed`: The operation failed. See `error_message` for details.
+          x-enum:
+          - Processing
+          - Completed
+          - Failed
+          type: string
+        created_on:
+          example: 2025-10-01T12:30:00Z
+          description: The timestamp when the operation was created, in ISO 8601 format.
+          type: string
+          format: date-time
+        completed_on:
+          nullable: true
+          example: 2025-10-01T12:35:00Z
+          description: The timestamp when the operation completed or failed, in ISO 8601 format. Present only when status is `Completed` or `Failed`.
+          type: string
+          format: date-time
+        percent_complete:
+          example: 42
+          description: The progress made by the operation, as a percentage (0-100).
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 100
+        error_message:
+          nullable: true
+          example: 'File processing failed: unsupported file format.'
+          description: |-
+            A message describing the error that caused the operation to fail.
+            Present only when status is `Failed`.
+          type: string
+        ingestion_units:
+          nullable: true
+          example: 50.0
+          description: |-
+            The number of ingestion units consumed by this operation.
+            Present only when status is `Completed` for file ingestion operations.
+          type: number
+          format: double
+      required:
+      - id
+      - operation_type
+      - status
+      - created_on
+    PaginationResponse:
+      example:
+        next: dXNlcl9pZD11c2VyXzE=
+      description: Object that contains the next pagination token to continue a previous listing operation.
+      type: object
+      properties:
+        next:
+          description: The token to use to retrieve the next page of results.
+          type: string
+      required:
+      - next
+    PdfReferenceModel:
+      title: PDF document reference
+      description: Represents a reference to a part of a PDF document.
+      type: object
+      properties:
+        type:
+          description: The type of reference. Always `pdf`.
+          type: string
+        file:
+          $ref: '#/components/schemas/AssistantFileModel'
+        pages:
+          description: A list of page numbers in the PDF document that are relevant to the query.
+          type: array
+          items:
+            type: integer
+      required:
+      - type
+      - file
+      - pages
+    ReferenceModel:
+      description: Describes a single reference in a citation.
+      type: object
+      properties:
+        file:
+          $ref: '#/components/schemas/AssistantFileModel'
+        pages:
+          description: A list of page numbers in the referenced document that contain the relevant content.
+          type: array
+          items:
+            type: integer
+        highlight:
+          $ref: '#/components/schemas/HighlightModel'
+    SearchCompletions:
+      description: Represents a request to chat with an assistant.
+      type: object
+      properties:
+        messages:
+          description: The list of messages sent to the assistant, used for context retrieval and generating response with the LLM.
+          type: array
+          items:
+            $ref: '#/components/schemas/MessageModel'
+        stream:
+          description: If `false`, the assistant returns a single JSON response. If `true`, the assistant returns a stream of responses.
+          default: false
+          type: boolean
+        model:
+          description: The large language model used to generate responses.
+          default: gpt-4o
+          x-enum:
+          - gpt-4o
+          - gpt-4.1
+          - o4-mini
+          - claude-sonnet-4-5
+          - gemini-2.5-pro
+          type: string
+        temperature:
+          description: 'Controls the randomness of the model''s output: lower values make responses more deterministic, while higher values increase creativity and variability. If the model does not support a temperature parameter, the parameter will be ignored.'
+          default: 0.0
+          type: number
+          format: float
+        filter:
+          example:
+            genre:
+              $ne: documentary
+          description: Optional metadata-based filter to restrict which documents are retrieved for the assistant's response context.
+          type: object
+      required:
+      - messages
+    SnippetModel:
+      description: Represents a part of a document that is relevant to the user query.
+      discriminator:
+        propertyName: type
+        mapping:
+          text: '#/components/schemas/TextSnippetModel'
+          multimodal: '#/components/schemas/MultiModalSnippetModel'
+      type: object
+      oneOf:
+      - $ref: '#/components/schemas/TextSnippetModel'
+      - $ref: '#/components/schemas/MultiModalSnippetModel'
+    StreamChatChunkModel:
+      description: Represents a chunk of a stream chat response.
+      discriminator:
+        propertyName: type
+        mapping:
+          message_start: '#/components/schemas/MessageStartModel'
+          content_chunk: '#/components/schemas/ContentChunkModel'
+          citation: '#/components/schemas/CitationChunkModel'
+          message_end: '#/components/schemas/MessageEndModel'
+      type: object
+      oneOf:
+      - $ref: '#/components/schemas/MessageStartModel'
+      - $ref: '#/components/schemas/ContentChunkModel'
+      - $ref: '#/components/schemas/CitationChunkModel'
+      - $ref: '#/components/schemas/MessageEndModel'
+    StreamChatCompletionChunkModel:
+      description: Describes the response format of a chat request.
+      type: object
+      properties:
+        id:
+          description: A unique identifier for this chat response.
+          type: string
+        choices:
+          description: A list of chat completion choices.
+          type: array
+          items:
+            $ref: '#/components/schemas/ChoiceChunkModel'
+        model:
+          description: The name or identifier of the model used to generate this chat response.
+          type: string
+    TextReferenceModel:
+      title: Text document reference
+      description: Represents a reference to a part of a text document.
+      type: object
+      properties:
+        type:
+          description: The type of reference. Always `text`.
+          type: string
+        file:
+          $ref: '#/components/schemas/AssistantFileModel'
+      required:
+      - type
+      - file
+    TextSnippetModel:
+      title: Text context snippet
+      description: Represents a text context snippet.
+      type: object
+      properties:
+        type:
+          description: The type of context snippet. Always `text`.
+          type: string
+        content:
+          description: The textual content of the snippet.
+          type: string
+        score:
+          description: A numerical score indicating the relevance of this snippet to the query.
+          type: number
+          format: float
+        reference:
+          $ref: '#/components/schemas/TypedReferenceModel'
+      required:
+      - type
+      - content
+      - score
+      - reference
     TypedReferenceModel:
       description: Represents a reference for the information provided.
       discriminator:
@@ -2041,6 +2032,21 @@ components:
       - $ref: '#/components/schemas/MarkdownReferenceModel'
       - $ref: '#/components/schemas/PdfReferenceModel'
       - $ref: '#/components/schemas/DocxReferenceModel'
+    UsageModel:
+      description: Describes the token usage associated with interactions with an assistant.
+      type: object
+      properties:
+        prompt_tokens:
+          description: |-
+            For chat interactions, the number of tokens in the LLM request (message, context snippets, and system prompt).
+            For context retrieval, the number of tokens in the LLM request used to generate search queries from the messages, plus the tokens in the retrieved context snippets.
+          type: integer
+        completion_tokens:
+          description: "For chat interactions, the number of tokens in the assistant's response.  \nFor context retrieval, this is always 0."
+          type: integer
+        total_tokens:
+          description: The total number of tokens used, equal to the sum of `prompt_tokens` and `completion_tokens`.
+          type: integer
   securitySchemes:
     ApiKeyAuth:
       type: apiKey
