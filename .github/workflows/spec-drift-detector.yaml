@@ -1,0 +1,147 @@
+# Detects when an OpenAPI spec change requires docs/SDK updates.
+#
+# On PR:      comments affected guide pages + impacted SDKs (breaking changes first).
+# Scheduled:  diffs the two newest version snapshots; opens a draft PR in pinecone-io/docs.
+#
+# Deps: Python 3.12 + pyyaml. No other runtime dependencies.
+
+name: spec-drift-detector
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths: ["**/*.oas.yaml"]
+  schedule:
+    - cron: "0 9 * * 1"   # Mondays 09:00 UTC
+  workflow_dispatch:
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: pip install pyyaml
+
+      # ── PR mode: diff each changed spec file (base..head) ───────────────
+      - name: PR diff
+        if: github.event_name == 'pull_request'
+        run: |
+          BASE='${{ github.event.pull_request.base.sha }}'
+          HEAD='${{ github.event.pull_request.head.sha }}'
+          CHANGED=$(git diff --name-only "$BASE" "$HEAD" -- '**/*.oas.yaml')
+          python - "$BASE" "$HEAD" $CHANGED <<'PY'
+          import json, sys, os
+          sys.path.insert(0, ".github/scripts")
+          import extract_spec_diff as e
+          base_ref, head_ref = sys.argv[1], sys.argv[2]
+          all_changes = []
+          for path in sys.argv[3:]:
+              b = e.load(e.git_show(base_ref, path))
+              h = e.load(e.git_show(head_ref, path))
+              svc = "_".join(os.path.basename(path).split("_")[:-1])  # db_data_2025-10.oas.yaml -> db_data
+              cs = e.diff(b, h)
+              for c in cs:
+                  c["service"] = svc
+                  c["version"] = path
+              all_changes += cs
+          json.dump(all_changes, open("spec-diff.json", "w"), indent=2)
+          print(f"{len(all_changes)} changes across changed specs")
+          PY
+
+      # ── Scheduled/manual: diff the two newest version dirs ──────────────
+      - name: Version-snapshot diff
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: |
+          python - <<'PY'
+          import glob, os, re, json, sys
+          sys.path.insert(0, ".github/scripts")
+          import extract_spec_diff as e
+          dirs = sorted([d for d in os.listdir(".") if re.fullmatch(r"\d{4}-\d{2}", d)], reverse=True)
+          if len(dirs) < 2:
+              json.dump([], open("spec-diff.json", "w")); print("need two version dirs"); raise SystemExit(0)
+          head_dir, base_dir = dirs[0], dirs[1]
+          all_changes = []
+          for hf in glob.glob(f"{head_dir}/*.oas.yaml"):
+              svc = "_".join(os.path.basename(hf).split("_")[:-1])  # strip trailing _<version>
+              matches = glob.glob(f"{base_dir}/{svc}_*.oas.yaml")
+              b = e.load(open(matches[0]).read()) if matches else {}
+              h = e.load(open(hf).read())
+              cs = e.diff(b, h)
+              for c in cs:
+                  c["service"] = svc
+                  c["version"] = head_dir
+              all_changes += cs
+          json.dump(all_changes, open("spec-diff.json", "w"), indent=2)
+          print(f"{base_dir} -> {head_dir}: {len(all_changes)} changes")
+          PY
+
+      - name: Check coverage
+        id: cov
+        run: |
+          python .github/scripts/check_spec_coverage.py \
+            --spec-diff spec-diff.json \
+            --manifest .github/spec-manifest.json \
+            --output spec-gaps.json
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request' && steps.cov.outputs.has_gaps == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs')
+            const gaps = JSON.parse(fs.readFileSync('spec-gaps.json', 'utf8'))
+            const breaking = gaps.filter(g => g.breaking)
+            const seen = new Set()
+            const byPage = {}
+            for (const g of gaps) {
+              const key = `${g.symbol}|${g.doc_page}`
+              if (seen.has(key)) continue; seen.add(key)
+              ;(byPage[g.doc_page] = byPage[g.doc_page] || []).push(g)
+            }
+            const sdks = [...new Set(gaps.flatMap(g => g.sdks))].sort()
+            const lines = ['## Spec drift detected', '', 'This PR changes the OpenAPI surface. Likely doc/SDK impact:', '']
+            if (breaking.length) {
+              lines.push('### ⚠️ Breaking changes')
+              const bseen = new Set()
+              for (const g of breaking) {
+                const key = `${g.symbol}|${g.detail}`
+                if (bseen.has(key)) continue; bseen.add(key)
+                lines.push(`- \`${g.symbol}\` — ${g.detail}`)
+              }
+              lines.push('')
+            }
+            lines.push('### Pages to update')
+            for (const [page, items] of Object.entries(byPage)) {
+              lines.push(`**\`${page}\`**`)
+              for (const g of items) lines.push(`- [ ] \`${g.symbol}\` (${g.change})${g.breaking ? ' ⚠️' : ''}: ${g.detail}`)
+              lines.push('')
+            }
+            if (sdks.length) lines.push(`**Impacted SDKs:** ${sdks.join(', ')}`)
+            lines.push('', '_Auto-detected. Dismiss when docs are updated, or close if not applicable._')
+            await github.rest.issues.createComment({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.issue.number, body: lines.join('\n'),
+            })
+
+      - name: Open docs stub PR
+        if: >
+          (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+          && steps.cov.outputs.has_gaps == 'true'
+        env:
+          DOCS_TOKEN: ${{ secrets.DOCS_GITHUB_TOKEN }}
+        run: |
+          python .github/scripts/open_docs_stub_pr.py \
+            --gaps spec-gaps.json \
+            --docs-repo pinecone-io/docs \
+            --token "$DOCS_TOKEN"
