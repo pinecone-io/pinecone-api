@@ -66,6 +66,16 @@ def _type(d):
     return s.get("type") or s.get("$ref")
 
 
+def _fmt(d):
+    """The `format` qualifier (e.g. int32, uuid) of a parameter/property schema."""
+    if not isinstance(d, dict):
+        return None
+    s = d.get("schema", d)
+    if not isinstance(s, dict):
+        return None
+    return s.get("format")
+
+
 def diff_operations(base: dict, head: dict) -> list[dict]:
     changes = []
     bo, ho = operations(base), operations(head)
@@ -85,12 +95,33 @@ def diff_operations(base: dict, head: dict) -> list[dict]:
 def diff_one_op(key: str, b: dict, h: dict) -> list[dict]:
     changes = []
     bp, hp = params(b), params(h)
+
+    # Parameter location changes (e.g. query -> path): a pure relocation otherwise
+    # shows up as a misleading remove + add. Detect by name and report once, breaking.
+    b_loc, h_loc = {}, {}
+    for nm, loc in bp:
+        b_loc.setdefault(nm, set()).add(loc)
+    for nm, loc in hp:
+        h_loc.setdefault(nm, set()).add(loc)
+    relocated = set()
+    for nm in b_loc.keys() & h_loc.keys():
+        if b_loc[nm] != h_loc[nm] and len(b_loc[nm]) == 1 and len(h_loc[nm]) == 1:
+            relocated.add(nm)
+            bl, hl = next(iter(b_loc[nm])), next(iter(h_loc[nm]))
+            changes.append({"kind": "operation", "id": key, "change": "modified", "breaking": True,
+                            "before": f"{nm} in {bl}", "after": f"{nm} in {hl}",
+                            "detail": f"parameter '{nm}' moved from {bl} to {hl}"})
+
     for name in bp.keys() - hp.keys():
+        if name[0] in relocated:
+            continue
         req = bool(bp[name].get("required"))
         changes.append({"kind": "operation", "id": key, "change": "modified", "breaking": req,
                         "before": f"param {name[0]}", "after": "",
                         "detail": f"{'required ' if req else ''}parameter '{name[0]}' removed"})
     for name in hp.keys() - bp.keys():
+        if name[0] in relocated:
+            continue
         req = bool(hp[name].get("required"))
         changes.append({"kind": "operation", "id": key, "change": "modified", "breaking": req,
                         "before": "", "after": f"param {name[0]}",
@@ -105,6 +136,18 @@ def diff_one_op(key: str, b: dict, h: dict) -> list[dict]:
             changes.append({"kind": "operation", "id": key, "change": "modified", "breaking": True,
                             "before": str(_type(pb)), "after": str(_type(ph)),
                             "detail": f"parameter '{name[0]}' type changed"})
+        if _fmt(pb) != _fmt(ph):
+            changes.append({"kind": "operation", "id": key, "change": "modified", "breaking": True,
+                            "before": str(_fmt(pb)), "after": str(_fmt(ph)),
+                            "detail": f"parameter '{name[0]}' format changed"})
+
+    # Removed response codes: consumers may branch on them, so removal is breaking.
+    br = {str(c) for c in (b.get("responses") or {})}
+    hr = {str(c) for c in (h.get("responses") or {})}
+    for code in br - hr:
+        changes.append({"kind": "operation", "id": key, "change": "modified", "breaking": True,
+                        "before": f"response {code}", "after": "",
+                        "detail": f"response '{code}' removed"})
     return changes
 
 
@@ -144,6 +187,10 @@ def diff_one_schema(name: str, b: dict, h: dict) -> list[dict]:
             changes.append({"kind": "schema", "id": f"{name}.{prop}", "change": "modified", "breaking": True,
                             "before": str(_type(bp[prop])), "after": str(_type(hp[prop])),
                             "detail": f"property '{prop}' type changed"})
+        if _fmt(bp[prop]) != _fmt(hp[prop]):
+            changes.append({"kind": "schema", "id": f"{name}.{prop}", "change": "modified", "breaking": True,
+                            "before": str(_fmt(bp[prop])), "after": str(_fmt(hp[prop])),
+                            "detail": f"property '{prop}' format changed"})
         be = set(bp[prop].get("enum") or []) if isinstance(bp[prop], dict) else set()
         he = set(hp[prop].get("enum") or []) if isinstance(hp[prop], dict) else set()
         for removed in be - he:

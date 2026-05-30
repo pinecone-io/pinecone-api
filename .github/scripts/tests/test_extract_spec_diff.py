@@ -37,6 +37,44 @@ def test_optional_param_added_is_not_breaking():
     assert c["breaking"] is False
 
 
+def test_param_format_change_is_breaking():
+    b = {"parameters": [{"name": "id", "in": "query", "schema": {"type": "integer", "format": "int32"}}]}
+    h = {"parameters": [{"name": "id", "in": "query", "schema": {"type": "integer", "format": "int64"}}]}
+    details = {c["detail"]: c["breaking"] for c in diff_one_op("op", b, h)}
+    assert details["parameter 'id' format changed"] is True
+    assert "parameter 'id' type changed" not in details  # type unchanged, only format
+
+
+def test_param_location_change_reported_once_as_breaking():
+    b = {"parameters": [{"name": "name", "in": "query", "required": True, "schema": {"type": "string"}}]}
+    h = {"parameters": [{"name": "name", "in": "path", "required": True, "schema": {"type": "string"}}]}
+    out = diff_one_op("op", b, h)
+    details = {c["detail"]: c["breaking"] for c in out}
+    assert details["parameter 'name' moved from query to path"] is True
+    # the relocation must NOT also surface as a remove + add
+    assert not any("removed" in d or "added" in d for d in details)
+
+
+def test_removed_response_code_is_breaking():
+    b = {"responses": {"200": {}, "404": {}}}
+    h = {"responses": {"200": {}}}
+    details = {c["detail"]: c["breaking"] for c in diff_one_op("op", b, h)}
+    assert details["response '404' removed"] is True
+
+
+def test_added_response_code_is_not_flagged():
+    b = {"responses": {"200": {}}}
+    h = {"responses": {"200": {}, "429": {}}}
+    assert all("response" not in c["detail"] for c in diff_one_op("op", b, h))
+
+
+def test_schema_property_format_change_is_breaking():
+    base = {"components": {"schemas": {"M": {"properties": {"ts": {"type": "string", "format": "date"}}}}}}
+    head = {"components": {"schemas": {"M": {"properties": {"ts": {"type": "string", "format": "date-time"}}}}}}
+    d = {c["detail"]: c["breaking"] for c in diff_schemas(base, head)}
+    assert d["property 'ts' format changed"] is True
+
+
 def test_schema_breaking_rules():
     base = {"components": {"schemas": {"Index": {
         "properties": {"name": {"type": "string"},

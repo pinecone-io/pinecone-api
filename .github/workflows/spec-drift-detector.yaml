@@ -113,7 +113,12 @@ jobs:
             const lines = ['## Spec drift detected', '', 'This PR changes the OpenAPI surface. Likely doc/SDK impact:', '']
             if (breaking.length) {
               lines.push('### ⚠️ Breaking changes')
-              for (const g of breaking) lines.push(`- \`${g.symbol}\` — ${g.detail}`)
+              const bseen = new Set()
+              for (const g of breaking) {
+                const key = `${g.symbol}|${g.detail}`
+                if (bseen.has(key)) continue; bseen.add(key)
+                lines.push(`- \`${g.symbol}\` — ${g.detail}`)
+              }
               lines.push('')
             }
             lines.push('### Pages to update')
