@@ -1,0 +1,39 @@
+{
+  "_comment": "Maps pinecone-api operationIds (and schema names) to the docs.pinecone.io guide pages and SDKs they surface. Edit when operations/schemas are added or pages renamed. Changed surface absent here is written to spec-gaps-unmapped.json on each run — tend that file to keep this current.",
+  "docs_base_url": "https://docs.pinecone.io",
+  "operations": {
+    "create_index": {"docs": ["guides/index-data/create-an-index"], "sdks": ["python", "ts", "go", "java"]},
+    "create_index_for_model": {"docs": ["guides/index-data/create-an-index", "guides/get-started/quickstart"], "sdks": ["python", "ts", "go", "java"]},
+    "list_indexes": {"docs": ["guides/manage-data/manage-indexes"], "sdks": ["python", "ts", "go", "java"]},
+    "describe_index": {"docs": ["guides/manage-data/manage-indexes"], "sdks": ["python", "ts", "go", "java"]},
+    "configure_index": {"docs": ["guides/manage-data/manage-indexes"], "sdks": ["python", "ts", "go", "java"]},
+    "delete_index": {"docs": ["guides/manage-data/manage-indexes"], "sdks": ["python", "ts", "go", "java"]},
+    "upsertVectors": {"docs": ["guides/index-data/upsert-data"], "sdks": ["python", "ts", "go", "java"]},
+    "upsertRecordsNamespace": {"docs": ["guides/index-data/upsert-data", "guides/get-started/quickstart"], "sdks": ["python", "ts"]},
+    "searchRecordsNamespace": {"docs": ["guides/search/search-overview", "guides/get-started/quickstart"], "sdks": ["python", "ts"]},
+    "queryVectors": {"docs": ["guides/search/search-overview"], "sdks": ["python", "ts", "go", "java"]},
+    "fetchVectors": {"docs": ["guides/manage-data/fetch-data"], "sdks": ["python", "ts", "go", "java"]},
+    "updateVector": {"docs": ["guides/manage-data/update-data"], "sdks": ["python", "ts", "go", "java"]},
+    "deleteVectors": {"docs": ["guides/manage-data/delete-data"], "sdks": ["python", "ts", "go", "java"]},
+    "listVectors": {"docs": ["guides/manage-data/list-record-ids"], "sdks": ["python", "ts", "go", "java"]},
+    "describeIndexStats": {"docs": ["guides/manage-data/manage-indexes"], "sdks": ["python", "ts", "go", "java"]},
+    "startBulkImport": {"docs": ["guides/index-data/import-data"], "sdks": ["python", "ts"]},
+    "describeBulkImport": {"docs": ["guides/index-data/import-data"], "sdks": ["python", "ts"]},
+    "listBulkImports": {"docs": ["guides/index-data/import-data"], "sdks": ["python", "ts"]},
+    "cancelBulkImport": {"docs": ["guides/index-data/import-data"], "sdks": ["python", "ts"]},
+    "create_backup": {"docs": ["guides/manage-data/back-up-an-index"], "sdks": ["python", "ts", "go", "java"]},
+    "create_index_from_backup_operation": {"docs": ["guides/manage-data/restore-an-index"], "sdks": ["python", "ts", "go", "java"]},
+    "create_collection": {"docs": ["guides/manage-data/manage-collections"], "sdks": ["python", "ts", "go", "java"]},
+    "createNamespace": {"docs": ["guides/manage-data/manage-namespaces"], "sdks": ["python", "ts", "go", "java"]},
+    "deleteNamespace": {"docs": ["guides/manage-data/manage-namespaces"], "sdks": ["python", "ts", "go", "java"]},
+    "embed": {"docs": ["guides/inference/generate-embeddings"], "sdks": ["python", "ts", "go", "java"]},
+    "rerank": {"docs": ["guides/search/rerank-results"], "sdks": ["python", "ts", "go", "java"]},
+    "list_models": {"docs": ["guides/inference/understanding-inference"], "sdks": ["python", "ts"]},
+    "get_model": {"docs": ["guides/inference/understanding-inference"], "sdks": ["python", "ts"]}
+  },
+  "schemas": {
+    "IndexModel": {"docs": ["guides/index-data/create-an-index"], "sdks": ["python", "ts", "go", "java"]},
+    "CreateIndexForModelRequest": {"docs": ["guides/index-data/create-an-index"], "sdks": ["python", "ts"]},
+    "SearchRecordsRequest": {"docs": ["guides/search/search-overview"], "sdks": ["python", "ts"]}
+  }
+}
