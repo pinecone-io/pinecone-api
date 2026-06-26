@@ -1875,12 +1875,10 @@ paths:
                       status: Completed
                       target_index_id: idx_456
                       target_index_name: my-index
-                    pagination: null
                 no-restore-jobs:
                   summary: An empty list.
                   value:
                     data: []
-                    pagination: null
         '401':
           description: 'Unauthorized. Possible causes: Invalid API key.'
           content:

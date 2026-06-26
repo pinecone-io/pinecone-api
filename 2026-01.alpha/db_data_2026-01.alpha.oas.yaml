@@ -1233,6 +1233,63 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/rpcStatus'
+  /namespaces/{namespace}/documents/update:
+    post:
+      tags:
+      - Document Operations
+      summary: Update documents
+      description: |-
+        Apply partial updates to documents in a namespace.
+
+        Each update is identified by its `_id`. Any other fields set new values for those fields, and fields listed in `_remove_fields` are removed from the document. Fields that are not mentioned are left unchanged. Updates to a document that does not exist are accepted but have no effect.
+      operationId: updateDocuments
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2026-01.alpha
+          type: string
+        style: simple
+      - in: path
+        name: namespace
+        description: The namespace to update documents in.
+        required: true
+        schema:
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDocumentsRequest'
+        required: true
+      responses:
+        '202':
+          description: The update request was successfully accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateDocumentsResponse'
+        '400':
+          description: Bad request. The request body included invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rpcStatus'
+        4XX:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rpcStatus'
+        5XX:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rpcStatus'
 components:
   schemas:
     StartImportRequest:
@@ -2614,6 +2671,50 @@ components:
     DeleteDocumentsResponse:
       example: {}
       description: The response for the `delete_documents` operation.
+      type: object
+    UpdateDocumentRecord:
+      example:
+        _id: doc-1
+        _remove_fields:
+        - content
+        title: Updated title
+      description: A partial update to a document, identified by `_id`. Any other fields set new values for those fields. Fields named in `_remove_fields` are removed from the document.
+      type: object
+      properties:
+        _id:
+          description: The unique identifier of the document to update.
+          type: string
+        _remove_fields:
+          description: A list of field names to delete from the document.
+          type: array
+          items:
+            type: string
+      required:
+      - _id
+      additionalProperties: true
+    UpdateDocumentsRequest:
+      example:
+        documents:
+        - _id: doc-1
+          title: Updated title
+        - _id: doc-2
+          _remove_fields:
+          - content
+      description: The request for the `update_documents` operation.
+      type: object
+      properties:
+        documents:
+          description: The list of partial document updates to apply.
+          type: array
+          items:
+            $ref: '#/components/schemas/UpdateDocumentRecord'
+          minItems: 1
+          maxItems: 1000
+      required:
+      - documents
+    UpdateDocumentsResponse:
+      example: {}
+      description: The response for the `update_documents` operation.
       type: object
   securitySchemes:
     ApiKeyAuth:

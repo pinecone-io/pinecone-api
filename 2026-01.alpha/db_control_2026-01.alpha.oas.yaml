@@ -1532,7 +1532,7 @@ paths:
       tags:
       - Manage Indexes
       summary: Create an index from a backup
-      description: Create an index from a backup.
+      description: Create an index from a backup. For serverless backups, you can optionally set `read_capacity` so the restored index is created with dedicated read nodes (DRN) instead of defaulting to on-demand capacity.
       operationId: create_index_from_backup_operation
       parameters:
       - in: header
@@ -1557,6 +1557,23 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CreateIndexFromBackupRequest'
+            examples:
+              on-demand:
+                summary: Restore with on-demand read capacity (default)
+                value:
+                  name: restored-index
+              dedicated:
+                summary: Restore directly onto dedicated read nodes
+                value:
+                  name: restored-drn-index
+                  read_capacity:
+                    dedicated:
+                      manual:
+                        replicas: 2
+                        shards: 2
+                      node_type: t1
+                      scaling: Manual
+                    mode: Dedicated
         required: true
       responses:
         '202':
@@ -1734,12 +1751,10 @@ paths:
                       status: Completed
                       target_index_id: idx_456
                       target_index_name: my-index
-                    pagination: null
                 no-restore-jobs:
                   summary: An empty list.
                   value:
                     data: []
-                    pagination: null
         '401':
           description: 'Unauthorized. Possible causes: Invalid API key.'
           content:
@@ -2305,9 +2320,11 @@ components:
         description:
           description: Optional description for this field.
           type: string
+        filterable:
+          description: Whether this field is indexed for metadata filtering.
+          type: boolean
       required:
       - type
-      additionalProperties: false
     ByocDeployment:
       example:
         deployment_type: byoc
@@ -2501,6 +2518,8 @@ components:
           $ref: '#/components/schemas/IndexTags'
         deletion_protection:
           $ref: '#/components/schemas/DeletionProtection'
+        read_capacity:
+          $ref: '#/components/schemas/ReadCapacity'
       required:
       - name
     CreateIndexFromBackupResponse:
@@ -2657,7 +2676,6 @@ components:
       - type
       - dimension
       - metric
-      additionalProperties: false
     ErrorResponse:
       example:
         error:
@@ -2732,9 +2750,11 @@ components:
         description:
           description: Optional description for this field.
           type: string
+        filterable:
+          description: Whether this field is indexed for metadata filtering.
+          type: boolean
       required:
       - type
-      additionalProperties: false
     IndexDeployment:
       description: |-
         The deployment configuration of a Pinecone index. The `deployment_type` field indicates which infrastructure model the index uses.
@@ -2803,6 +2823,8 @@ components:
             title:
               full_text_search:
                 language: en
+                stemming: false
+                stop_words: false
               type: string
         status:
           ready: true
@@ -2892,6 +2914,8 @@ components:
           title:
             full_text_search:
               language: en
+              stemming: false
+              stop_words: false
             type: string
       description: The schema of a Pinecone index. The schema defines the typed fields that documents in the index can contain, including vector fields, semantic text fields, and metadata fields.
       type: object
@@ -2905,27 +2929,16 @@ components:
       - fields
     IndexSchemaField:
       description: |-
-        The configuration of a single field in the index schema. The `type` property determines how the field is stored and searched.
-        Supported field types:
-        - `dense_vector`: Fixed-dimension floating-point vectors for ANN search. - `sparse_vector`: Sparse vectors for keyword or hybrid search. - `semantic_text`: Text field backed by an integrated embedding model. - `string`: String field for full-text search. - `string_list`: String array field. - `float`: Numeric field. - `boolean`: Boolean field.
-      discriminator:
-        propertyName: type
-        mapping:
-          dense_vector: '#/components/schemas/DenseVectorField'
-          sparse_vector: '#/components/schemas/SparseVectorField'
-          semantic_text: '#/components/schemas/SemanticTextField'
-          string: '#/components/schemas/StringField'
-          string_list: '#/components/schemas/StringListField'
-          float: '#/components/schemas/FloatField'
-          boolean: '#/components/schemas/BooleanField'
-      oneOf:
-      - $ref: '#/components/schemas/DenseVectorField'
-      - $ref: '#/components/schemas/SparseVectorField'
-      - $ref: '#/components/schemas/SemanticTextField'
-      - $ref: '#/components/schemas/StringField'
-      - $ref: '#/components/schemas/StringListField'
-      - $ref: '#/components/schemas/FloatField'
-      - $ref: '#/components/schemas/BooleanField'
+        The configuration of a single field in the index schema.
+        Most fields carry a `type` property that identifies the field type:
+        - `dense_vector`: Fixed-dimension floating-point vectors for ANN search. - `sparse_vector`: Sparse vectors for keyword or hybrid search. - `semantic_text`: Text field backed by an integrated embedding model. - `string`: String field for full-text search or metadata filtering. - `string_list`: String array field. - `float`: Numeric field. - `integer`: Legacy numeric field from older indexes (pre-dating float
+
+          normalization). Will not appear in new indexes.
+        - `boolean`: Boolean field.
+        Fields in older indexes may omit `type` entirely. These are legacy metadata fields from before typed schemas were introduced.
+      anyOf:
+      - $ref: '#/components/schemas/TypedIndexSchemaField'
+      - $ref: '#/components/schemas/LegacyMetadataField'
     IndexTags:
       example:
         tag0: val0
@@ -2934,6 +2947,40 @@ components:
       type: object
       additionalProperties:
         type: string
+    IntegerField:
+      example:
+        filterable: true
+        type: integer
+      title: Integer
+      description: A legacy integer field configuration. Integer fields were used in older index schemas before numeric values were normalized to `float` at upsert time. New indexes will not produce this field type; it may appear in responses for indexes created before that normalization was introduced.
+      type: object
+      properties:
+        type:
+          description: Identifies this as an integer field. Must be `integer`.
+          type: string
+          enum:
+          - integer
+        description:
+          description: Optional description for this field.
+          type: string
+        filterable:
+          description: Whether this field is indexed for metadata filtering.
+          type: boolean
+      required:
+      - type
+    LegacyMetadataField:
+      example:
+        filterable: true
+      title: Legacy metadata
+      description: A legacy metadata field from indexes created before typed schema fields were introduced. The original data type of the field (string, float, boolean, etc.) was not recorded. Only the `filterable` flag is available. This field type will not appear in new indexes; it may appear in responses for older indexes pending schema migration.
+      type: object
+      properties:
+        filterable:
+          description: Whether this field is indexed for metadata filtering.
+          type: boolean
+      required:
+      - filterable
+      additionalProperties: false
     ManagedDeployment:
       example:
         cloud: aws
@@ -3215,6 +3262,70 @@ components:
           type: string
       required:
       - state
+    ResponseStringField:
+      example:
+        full_text_search:
+          language: en
+          stemming: false
+          stop_words: false
+        type: string
+      title: String
+      description: A string field as returned in index schema responses. String fields configured for full-text search include a `full_text_search` object; string fields used for metadata filtering only include a `filterable` flag.
+      type: object
+      properties:
+        type:
+          description: Identifies this as a string field. Must be `string`.
+          type: string
+          enum:
+          - string
+        description:
+          description: Optional description for this field.
+          type: string
+        full_text_search:
+          description: Full-text search configuration. Present when the field is indexed for full-text search.
+          type: object
+          properties:
+            language:
+              example: en
+              description: The language used for text analysis. Defaults to `en`.
+              default: en
+              type: string
+            stemming:
+              description: Whether stemming is applied during text analysis.
+              type: boolean
+            stop_words:
+              description: 'Whether stop words are filtered during text analysis. Only `true` if `stemming: true`.'
+              type: boolean
+            ngram:
+              description: Character n-gram tokenization configuration. Present only when the field is configured for n-gram substring matching.
+              type: object
+              properties:
+                min_gram:
+                  example: 2
+                  description: Minimum n-gram length.
+                  type: integer
+                max_gram:
+                  example: 3
+                  description: Maximum n-gram length.
+                  type: integer
+                prefix_only:
+                  description: Whether only prefix n-grams anchored at the start of the token are generated.
+                  type: boolean
+              required:
+              - min_gram
+              - max_gram
+              - prefix_only
+              additionalProperties: false
+          required:
+          - language
+          - stemming
+          - stop_words
+          additionalProperties: false
+        filterable:
+          description: Whether this field is indexed for metadata filtering.
+          type: boolean
+      required:
+      - type
     RestoreJobList:
       description: The list of restore jobs that exist in the project.
       type: object
@@ -3330,7 +3441,6 @@ components:
       required:
       - type
       - model
-      additionalProperties: false
     SparseVectorField:
       example:
         type: sparse_vector
@@ -3345,7 +3455,6 @@ components:
           - sparse_vector
       required:
       - type
-      additionalProperties: false
     StringField:
       example:
         full_text_search:
@@ -3366,7 +3475,7 @@ components:
         full_text_search:
           description: |-
             Full-text search configuration. When present, the field is indexed for full-text search.
-            `stop_words` requires `stemming: true`.
+            `stop_words` requires `stemming: true`. `ngram` cannot be combined with `stemming` or `stop_words`.
           type: object
           properties:
             language:
@@ -3382,22 +3491,37 @@ components:
               description: 'Whether to filter stop words during text analysis. Requires `stemming: true`. Defaults to `false`.'
               default: false
               type: boolean
-            lowercase:
-              readOnly: true
-              description: Whether to lowercase tokens during text analysis. Defaults to `true`. Read-only; set by the server.
-              default: true
-              type: boolean
-            max_term_len:
-              readOnly: true
-              description: The maximum token length to index. Tokens exceeding this length are truncated. Defaults to `40`. Read-only; set by the server.
-              default: 40
-              type: integer
+            ngram:
+              description: Character n-gram tokenization for substring matching. When present, the field is tokenized into character n-grams instead of words. Cannot be combined with `stemming` or `stop_words`.
+              type: object
+              properties:
+                min_gram:
+                  example: 2
+                  description: Minimum n-gram length. Must be at least 1 and no greater than `max_gram`.
+                  type: integer
+                  minimum: 1
+                  maximum: 10
+                max_gram:
+                  example: 3
+                  description: Maximum n-gram length. Must be no less than `min_gram` and at most 10.
+                  type: integer
+                  minimum: 1
+                  maximum: 10
+                prefix_only:
+                  description: When `true`, only prefix n-grams anchored at the start of the token are generated (e.g. for autocomplete). Defaults to `false`.
+                  default: false
+                  type: boolean
+              required:
+              - min_gram
+              - max_gram
+              additionalProperties: false
           additionalProperties: false
       required:
       - type
       additionalProperties: false
     StringListField:
       example:
+        filterable: true
         type: string_list
       title: String array
       description: A string array field configuration. String array values are not declared in the index schema; include them as document metadata instead — they are indexed automatically at upsert time.
@@ -3411,9 +3535,34 @@ components:
         description:
           description: Optional description for this field.
           type: string
+        filterable:
+          description: Whether this field is indexed for metadata filtering.
+          type: boolean
       required:
       - type
-      additionalProperties: false
+    TypedIndexSchemaField:
+      title: Typed field
+      description: A schema field that carries a `type` discriminator. This covers all field types in current use. See `IndexSchemaField` for the full union that also includes legacy untyped fields.
+      discriminator:
+        propertyName: type
+        mapping:
+          dense_vector: '#/components/schemas/DenseVectorField'
+          sparse_vector: '#/components/schemas/SparseVectorField'
+          semantic_text: '#/components/schemas/SemanticTextField'
+          string: '#/components/schemas/ResponseStringField'
+          string_list: '#/components/schemas/StringListField'
+          float: '#/components/schemas/FloatField'
+          integer: '#/components/schemas/IntegerField'
+          boolean: '#/components/schemas/BooleanField'
+      oneOf:
+      - $ref: '#/components/schemas/DenseVectorField'
+      - $ref: '#/components/schemas/SparseVectorField'
+      - $ref: '#/components/schemas/SemanticTextField'
+      - $ref: '#/components/schemas/ResponseStringField'
+      - $ref: '#/components/schemas/StringListField'
+      - $ref: '#/components/schemas/FloatField'
+      - $ref: '#/components/schemas/IntegerField'
+      - $ref: '#/components/schemas/BooleanField'
   securitySchemes:
     ApiKeyAuth:
       type: apiKey
