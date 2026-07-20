@@ -1104,10 +1104,7 @@ paths:
       description: |
         List users who are members of the caller's organization. Results are paginated.
         Optional filters:
-        - `email` — exact match on the user's email address; returns at most
-
-          one user.
-
+        - `email` — case-insensitive match on the user's email address.
         Pagination tokens apply to the full query, including `email`. See query parameters for cursor rules.
         Role bindings are not included. Use `GET /admin/role-bindings` with `principal_type` and `principal_id` to list them.
       operationId: list_users
@@ -1122,7 +1119,7 @@ paths:
         style: simple
       - in: query
         name: email
-        description: Exact-match filter on the user's email address. Returns at most one user. Malformed email returns `400 INVALID_ARGUMENT`.
+        description: Case-insensitive filter on the user's email address. Malformed email returns `400 INVALID_ARGUMENT`.
         schema:
           type: string
           format: email
@@ -1161,7 +1158,7 @@ paths:
                     pagination:
                       next: eyJsYXN0X2lkIjoiZTJlOTI1MjMifQ==
                 email-filter-match:
-                  summary: Exact-match email filter, found
+                  summary: Case-insensitive email filter, found
                   value:
                     data:
                     - email: alice@example.com
@@ -1169,7 +1166,7 @@ paths:
                       name: Alice Example
                     pagination: null
                 email-filter-empty:
-                  summary: Exact-match email filter, no match
+                  summary: Case-insensitive email filter, no match
                   value:
                     data: []
                     pagination: null
@@ -1312,7 +1309,7 @@ paths:
       summary: Remove a user from the organization
       description: |
         Remove a user from the organization and revoke their role bindings. Does not delete the user's Pinecone account.
-        Returns `202`. The user may still appear in get requests briefly, then returns `404`. Repeat requests return `202` until cleanup completes, then `404`.
+        Returns `202`. The user's role bindings are revoked immediately, so the user no longer appears in get or list requests and instead returns `404`. A repeat request for the same user returns `404`.
         Returns `409` when removing the last `OrgOwner` in the organization.
       operationId: delete_user
       parameters:
@@ -1631,20 +1628,6 @@ paths:
                       code: ALREADY_EXISTS
                       message: This email already belongs to a member of the organization.
                     status: 409
-        '422':
-          description: Unprocessable entity. The request body could not be deserialized.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              examples:
-                missing-field:
-                  summary: Unprocessable entity
-                  value:
-                    error:
-                      code: UNPROCESSABLE_ENTITY
-                      message: 'Failed to deserialize the JSON body into the target type: missing field `metric` at line 1 column 16'
-                    status: 422
         4XX:
           description: Unexpected error on request.
           content:
@@ -2163,20 +2146,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '422':
-          description: Unprocessable entity. The request body could not be deserialized.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              examples:
-                missing-field:
-                  summary: Unprocessable entity
-                  value:
-                    error:
-                      code: UNPROCESSABLE_ENTITY
-                      message: 'Failed to deserialize the JSON body into the target type: missing field `metric` at line 1 column 16'
-                    status: 422
         4XX:
           description: Unexpected error on request.
           content:
@@ -2705,7 +2674,7 @@ paths:
       description: |
         Grant a role to a principal at an organization or project scope.
         Set `resource_type` to select the scope. For `project` scope, `resource_id` is required and must be the project UUID. For `organization` scope, omit `resource_id`; the binding applies to the caller's organization.
-        Returns `409` if an identical binding already exists.
+        Returns `409` if an identical binding already exists, or if the target principal is an invite that has already been accepted (processed).
       operationId: create_role_binding
       parameters:
       - in: header
@@ -2828,20 +2797,6 @@ paths:
                       code: ALREADY_EXISTS
                       message: This email already belongs to a member of the organization.
                     status: 409
-        '422':
-          description: Unprocessable entity. The request body could not be deserialized.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              examples:
-                missing-field:
-                  summary: Unprocessable entity
-                  value:
-                    error:
-                      code: UNPROCESSABLE_ENTITY
-                      message: 'Failed to deserialize the JSON body into the target type: missing field `metric` at line 1 column 16'
-                    status: 422
         4XX:
           description: Unexpected error on request.
           content:
@@ -2946,13 +2901,16 @@ paths:
       summary: Delete a role binding
       description: |
         Delete a role binding. Permissions are revoked when the deletion completes.
-        Returns `202`. The binding may still appear in list or get requests briefly before it returns `404`. Repeat delete requests return `202` until cleanup finishes, then `404`.
+        Returns `202`. The binding is removed immediately, so it no longer appears in list or get requests and instead returns `404`. A repeat delete request for the same binding returns `404`.
         Returns `409` when deleting:
         - The last `OrgOwner` binding for a user in the organization.
-        - The last organization binding for a user who still has project bindings.
-        - The last organization binding for a pending invite (delete the invite
+        - The last organization-membership role binding for a user who still has
 
-          instead).
+          other role bindings.
+
+        - The last organization-membership role binding for a pending invite
+
+          (delete the invite instead).
       operationId: delete_role_binding
       parameters:
       - in: header
