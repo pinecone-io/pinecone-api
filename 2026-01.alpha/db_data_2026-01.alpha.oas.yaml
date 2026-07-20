@@ -1290,6 +1290,63 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/rpcStatus'
+  /namespaces/{namespace}/documents/list:
+    post:
+      tags:
+      - Document Operations
+      summary: List documents
+      description: |-
+        List documents in a namespace.
+
+        Returns up to 100 documents per page by default, in sorted order (bitwise "C" collation). Use the optional `prefix` parameter to limit results to documents whose IDs start with a given prefix. When there are more documents to return, the response includes a `pagination` token you can pass to retrieve the next page. When no `pagination` token is returned, there are no more documents to list.
+      operationId: listDocuments
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2026-01.alpha
+          type: string
+        style: simple
+      - in: path
+        name: namespace
+        description: The namespace to list documents from.
+        required: true
+        schema:
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ListDocumentsRequest'
+        required: true
+      responses:
+        '200':
+          description: A successful list response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListDocumentsResponse'
+        '400':
+          description: Bad request. The request body included invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rpcStatus'
+        4XX:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rpcStatus'
+        5XX:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rpcStatus'
 components:
   schemas:
     StartImportRequest:
@@ -2716,6 +2773,80 @@ components:
       example: {}
       description: The response for the `update_documents` operation.
       type: object
+    ListDocumentsRequest:
+      example:
+        limit: 20
+        prefix: doc-
+      description: The request for the `list_documents` operation.
+      type: object
+      properties:
+        prefix:
+          description: A prefix to filter document IDs. Only documents whose IDs begin with this prefix are returned.
+          type: string
+        limit:
+          description: The maximum number of documents to return per page. Defaults to 100.
+          default: 100
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 100
+        pagination_token:
+          description: A pagination token from a previous list response, used to retrieve the next page of results.
+          type: string
+    ListedDocumentRecord:
+      example:
+        _id: doc-1
+      description: A listed document containing only its ID.
+      type: object
+      properties:
+        _id:
+          description: The unique identifier of the document.
+          type: string
+      required:
+      - _id
+    DocumentListUsage:
+      example:
+        read_units: 1
+      description: Usage information for the `list_documents` operation.
+      type: object
+      properties:
+        read_units:
+          example: 1
+          description: The number of read units consumed by this operation.
+          type: integer
+          format: int32
+      required:
+      - read_units
+    ListDocumentsResponse:
+      example:
+        documents:
+        - _id: doc-1
+        - _id: doc-2
+        namespace: my-namespace
+        pagination:
+          next: Tm90aGluZyB0byBzZWUgaGVyZQo=
+        usage:
+          read_units: 1
+      description: The response for the `list_documents` operation.
+      type: object
+      properties:
+        documents:
+          description: The listed documents, in sorted order by ID.
+          type: array
+          items:
+            $ref: '#/components/schemas/ListedDocumentRecord'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+        namespace:
+          example: my-namespace
+          description: The namespace the documents were listed from.
+          type: string
+        usage:
+          $ref: '#/components/schemas/DocumentListUsage'
+      required:
+      - documents
+      - namespace
+      - usage
   securitySchemes:
     ApiKeyAuth:
       type: apiKey
