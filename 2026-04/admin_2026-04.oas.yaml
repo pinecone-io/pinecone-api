@@ -76,7 +76,7 @@ paths:
       tags:
       - Projects
       summary: Create a new project
-      description: Creates a new project.
+      description: Create a new project.
       operationId: create_project
       parameters:
       - in: header
@@ -223,7 +223,7 @@ paths:
       tags:
       - Projects
       summary: Get project details
-      description: Get details about a project.
+      description: Get a project's details.
       operationId: fetch_project
       parameters:
       - in: header
@@ -294,8 +294,7 @@ paths:
       - Projects
       summary: Delete a project
       description: |
-        Delete a project and all its associated configuration.
-        Before deleting a project, you must delete all indexes, assistants, backups, and collections associated with the project. Other project resources, such as API keys, are automatically deleted when the project is deleted.
+        Delete a project and all its configuration; delete its indexes, assistants, backups, and collections first.
       operationId: delete_project
       parameters:
       - in: header
@@ -316,7 +315,7 @@ paths:
         style: simple
       responses:
         '202':
-          description: Project deletion request accepted.
+          description: Project deletion request accepted. Other project resources, such as API keys, are deleted automatically.
         '401':
           description: 'Unauthorized. Possible causes: Invalid API key.'
           content:
@@ -368,8 +367,7 @@ paths:
       - Projects
       summary: Update a project
       description: |
-        Update a project's configuration details.
-        You can update the project's name, maximum number of Pods, or enable encryption with a customer-managed encryption key (CMEK).
+        Update a project's name, maximum number of Pods, or customer-managed encryption key (CMEK).
       operationId: update_project
       parameters:
       - in: header
@@ -468,7 +466,7 @@ paths:
       tags:
       - Organizations
       summary: Get organization details
-      description: Get details about an organization.
+      description: Get an organization's details.
       operationId: fetch_organization
       parameters:
       - in: header
@@ -538,8 +536,7 @@ paths:
       - Organizations
       summary: Delete an organization
       description: |
-        Delete an organization and all its associated configuration.
-        Before deleting an organization, you must delete all projects (including indexes, assistants, backups, and collections) associated with the organization.
+        Delete an organization and all its configuration; delete all its projects first.
       operationId: delete_organization
       parameters:
       - in: header
@@ -774,7 +771,7 @@ paths:
       - API Keys
       summary: Create an API key
       description: |
-        Create a new API key for a project. Developers can use the API key to authenticate requests to Pinecone's Data Plane and Control Plane APIs.
+        Create an API key for a project to authenticate Data Plane and Control Plane requests.
       operationId: create_api_key
       parameters:
       - in: header
@@ -866,7 +863,7 @@ paths:
       tags:
       - API Keys
       summary: Get API key details
-      description: Get the details of an API key, excluding the API key secret.
+      description: Get an API key's details, excluding its secret.
       operationId: fetch_api_key
       parameters:
       - in: header
@@ -1008,8 +1005,7 @@ paths:
       tags:
       - API Keys
       summary: Update an API key
-      description: |
-        Update the name and roles of an API key.
+      description: Update an API key's name and roles.
       operationId: update_api_key
       parameters:
       - in: header
@@ -1102,11 +1098,7 @@ paths:
       - Users
       summary: List users in the organization
       description: |
-        List users who are members of the caller's organization. Results are paginated.
-        Optional filters:
-        - `email` — case-insensitive match on the user's email address.
-        Pagination tokens apply to the full query, including `email`. See query parameters for cursor rules.
-        Role bindings are not included. Use `GET /admin/role-bindings` with `principal_type` and `principal_id` to list them.
+        List users in the caller's organization, optionally filtered by email address.
       operationId: list_users
       parameters:
       - in: header
@@ -1142,7 +1134,7 @@ paths:
         style: form
       responses:
         '200':
-          description: A paginated list of users.
+          description: A paginated list of users. Role bindings are not included; use `GET /admin/role-bindings` to list them.
           content:
             application/json:
               schema:
@@ -1229,9 +1221,7 @@ paths:
       tags:
       - Users
       summary: Get user details
-      description: |
-        Get a user by ID. Returns `404` if the user is not in your organization.
-        Role bindings are not included. Use `GET /admin/role-bindings` with `principal_type` and `principal_id` to list them.
+      description: Get a user in the caller's organization by ID.
       operationId: fetch_user
       parameters:
       - in: header
@@ -1252,7 +1242,7 @@ paths:
         style: simple
       responses:
         '200':
-          description: The user details.
+          description: The user's details. Role bindings are not included; use `GET /admin/role-bindings` to list the user's roles.
           content:
             application/json:
               schema:
@@ -1308,9 +1298,7 @@ paths:
       - Users
       summary: Remove a user from the organization
       description: |
-        Remove a user from the organization and revoke their role bindings. Does not delete the user's Pinecone account.
-        Returns `202`. The user's role bindings are revoked immediately, so the user no longer appears in get or list requests and instead returns `404`. A repeat request for the same user returns `404`.
-        Returns `409` when removing the last `OrgOwner` in the organization.
+        Remove a user from the organization and revoke their role bindings; their Pinecone account is not deleted.
       operationId: delete_user
       parameters:
       - in: header
@@ -1331,7 +1319,7 @@ paths:
         style: simple
       responses:
         '202':
-          description: User removal request accepted.
+          description: User removal request accepted. The user's role bindings are revoked immediately; the user then returns 404, and repeating the request returns 404 as well.
         '401':
           description: 'Unauthorized. Possible causes: Invalid API key.'
           content:
@@ -1384,7 +1372,7 @@ paths:
                   value:
                     error:
                       code: ALREADY_EXISTS
-                      message: A pending invite already exists for this email.
+                      message: A pending invite already exists for this email; its ID is 9c8e3528-b9c0-4358-84ce-84c28e91b566.
                     status: 409
                 already-member:
                   summary: 'Invite rejected: email already belongs to an org member'
@@ -1392,6 +1380,34 @@ paths:
                     error:
                       code: ALREADY_EXISTS
                       message: This email already belongs to a member of the organization.
+                    status: 409
+                duplicate-role-binding:
+                  summary: 'Role binding rejected: identical binding already exists'
+                  value:
+                    error:
+                      code: ALREADY_EXISTS
+                      message: A role binding with these attributes already exists.
+                    status: 409
+                binding-to-processed-invite:
+                  summary: 'Role binding rejected: invite already accepted'
+                  value:
+                    error:
+                      code: ALREADY_EXISTS
+                      message: The invite has already been accepted; manage role bindings on the resulting user instead.
+                    status: 409
+                last-org-membership-binding:
+                  summary: Cannot remove the last organization-membership binding for a user
+                  value:
+                    error:
+                      code: ABORTED
+                      message: Cannot delete the last organization-membership role binding for this user.
+                    status: 409
+                invite-membership-binding:
+                  summary: Cannot remove the last organization-membership binding for a pending invite
+                  value:
+                    error:
+                      code: ABORTED
+                      message: Cannot delete the last organization-membership role binding for a pending invite; delete the invite instead.
                     status: 409
         4XX:
           description: Unexpected error on request.
@@ -1418,9 +1434,7 @@ paths:
       tags:
       - Invites
       summary: List invites
-      description: |
-        List invites in the caller's organization. Results are paginated. Returns pending and expired invites (processed and deleted invites are excluded); use `status` to distinguish pending from expired. See query parameters for cursor rules.
-        Role bindings are not included. Use `GET /admin/role-bindings` with `principal_type` and `principal_id` to list them.
+      description: List pending and expired invites in the caller's organization.
       operationId: list_invites
       parameters:
       - in: header
@@ -1448,7 +1462,7 @@ paths:
         style: form
       responses:
         '200':
-          description: A paginated list of invites.
+          description: A paginated list of pending and expired invites; processed and deleted invites are excluded. To view an invite's role bindings, call `GET /admin/role-bindings` with `principal_type=invite` as a filter.
           content:
             application/json:
               schema:
@@ -1512,11 +1526,7 @@ paths:
       - Invites
       summary: Invite a user to the organization
       description: |
-        Invite a user to join the organization. Sends an email with an acceptance link.
-        Grant roles with `role_bindings`. Include at least one `organization`-scoped binding that grants organization membership (`OrgOwner`, `OrgManager`, `OrgBillingAdmin`, or `OrgMember`; omit `resource_id`); add `project`-scoped bindings (with a `resource_id`) to grant project roles. Bindings are not returned in the response.
-        If a pending or expired invite already exists for the email, returns `409` with the existing invite's ID in the error message. Use `POST /admin/invites/{invite_id}/resend` to resend the email, and the role-bindings endpoints to change the invite's bindings.
-        If the email already belongs to a member of the organization, returns `409` (see shared conflict response). Manage that user's roles with the role-bindings endpoints instead.
-        An invite's bindings are first-class role bindings: they appear in `GET /admin/role-bindings` with `principal_type=invite` and `principal_id` equal to the invite ID, and can be added or removed with the role-bindings endpoints.
+        Invite a user to the organization by email and grant their initial role bindings.
       operationId: create_invite
       parameters:
       - in: header
@@ -1554,7 +1564,7 @@ paths:
         required: true
       responses:
         '200':
-          description: Invite created and email sent.
+          description: Invite created and email sent. The invite's role bindings are first-class; view or change them through the role-binding endpoints.
           content:
             application/json:
               schema:
@@ -1619,7 +1629,7 @@ paths:
                   value:
                     error:
                       code: ALREADY_EXISTS
-                      message: A pending invite already exists for this email.
+                      message: A pending invite already exists for this email; its ID is 9c8e3528-b9c0-4358-84ce-84c28e91b566.
                     status: 409
                 already-member:
                   summary: 'Invite rejected: email already belongs to an org member'
@@ -1627,6 +1637,34 @@ paths:
                     error:
                       code: ALREADY_EXISTS
                       message: This email already belongs to a member of the organization.
+                    status: 409
+                duplicate-role-binding:
+                  summary: 'Role binding rejected: identical binding already exists'
+                  value:
+                    error:
+                      code: ALREADY_EXISTS
+                      message: A role binding with these attributes already exists.
+                    status: 409
+                binding-to-processed-invite:
+                  summary: 'Role binding rejected: invite already accepted'
+                  value:
+                    error:
+                      code: ALREADY_EXISTS
+                      message: The invite has already been accepted; manage role bindings on the resulting user instead.
+                    status: 409
+                last-org-membership-binding:
+                  summary: Cannot remove the last organization-membership binding for a user
+                  value:
+                    error:
+                      code: ABORTED
+                      message: Cannot delete the last organization-membership role binding for this user.
+                    status: 409
+                invite-membership-binding:
+                  summary: Cannot remove the last organization-membership binding for a pending invite
+                  value:
+                    error:
+                      code: ABORTED
+                      message: Cannot delete the last organization-membership role binding for a pending invite; delete the invite instead.
                     status: 409
         4XX:
           description: Unexpected error on request.
@@ -1653,9 +1691,7 @@ paths:
       tags:
       - Invites
       summary: Get invite details
-      description: |
-        Get an invite by ID. Returns `404` if the invite is not in your organization.
-        Role bindings are not included. Use `GET /admin/role-bindings` with `principal_type` and `principal_id` to list them.
+      description: Get an invite in the caller's organization by ID.
       operationId: fetch_invite
       parameters:
       - in: header
@@ -1676,7 +1712,7 @@ paths:
         style: simple
       responses:
         '200':
-          description: The invite details.
+          description: The invite details. To view this invite's role bindings, call `GET /admin/role-bindings` with `principal_type=invite` as a filter.
           content:
             application/json:
               schema:
@@ -1732,8 +1768,7 @@ paths:
       - Invites
       summary: Delete an invite
       description: |
-        Delete a pending or expired invite and its role bindings, revoking the acceptance link. Returns `202`; the invite is then no longer returned by get requests (returns `404`).
-        Deleting an already-accepted (processed) invite returns `409`; the underlying user is unaffected. To remove an accepted user, use `DELETE /admin/users/{user_id}` instead. Deleting an invite that does not exist in your organization returns `404`.
+        Delete a pending or expired invite and its role bindings; to remove an accepted user, delete the user instead.
       operationId: delete_invite
       parameters:
       - in: header
@@ -1754,7 +1789,7 @@ paths:
         style: simple
       responses:
         '202':
-          description: Invite deletion request accepted.
+          description: Invite deletion request accepted. The invite and its role bindings are removed immediately; the invite then returns 404, and repeating the request returns 404 as well.
         '401':
           description: 'Unauthorized. Possible causes: Invalid API key.'
           content:
@@ -1807,7 +1842,7 @@ paths:
                   value:
                     error:
                       code: ALREADY_EXISTS
-                      message: A pending invite already exists for this email.
+                      message: A pending invite already exists for this email; its ID is 9c8e3528-b9c0-4358-84ce-84c28e91b566.
                     status: 409
                 already-member:
                   summary: 'Invite rejected: email already belongs to an org member'
@@ -1815,6 +1850,34 @@ paths:
                     error:
                       code: ALREADY_EXISTS
                       message: This email already belongs to a member of the organization.
+                    status: 409
+                duplicate-role-binding:
+                  summary: 'Role binding rejected: identical binding already exists'
+                  value:
+                    error:
+                      code: ALREADY_EXISTS
+                      message: A role binding with these attributes already exists.
+                    status: 409
+                binding-to-processed-invite:
+                  summary: 'Role binding rejected: invite already accepted'
+                  value:
+                    error:
+                      code: ALREADY_EXISTS
+                      message: The invite has already been accepted; manage role bindings on the resulting user instead.
+                    status: 409
+                last-org-membership-binding:
+                  summary: Cannot remove the last organization-membership binding for a user
+                  value:
+                    error:
+                      code: ABORTED
+                      message: Cannot delete the last organization-membership role binding for this user.
+                    status: 409
+                invite-membership-binding:
+                  summary: Cannot remove the last organization-membership binding for a pending invite
+                  value:
+                    error:
+                      code: ABORTED
+                      message: Cannot delete the last organization-membership role binding for a pending invite; delete the invite instead.
                     status: 409
         4XX:
           description: Unexpected error on request.
@@ -1842,12 +1905,7 @@ paths:
       - Invites
       summary: Resend an invite email
       description: |
-        Resend the invite email and extend `expires_at` by 7 days.
-        Resending an expired invite is allowed: it extends `expires_at` by 7 days from now, returning the invite to `pending`.
-        Resending an already-accepted (processed) invite returns `409` (see shared conflict response).
-        Limited to 100 invite emails per hour per organization. Returns `429` when exceeded.
-        Repeat requests may send another email and extend expiry again.
-        Role bindings are not included. Use `GET /admin/role-bindings` with `principal_type` and `principal_id` to list them.
+        Resend the invite email and extend its expiration to 7 days from now; limited to 100 emails per hour per organization.
       operationId: resend_invite
       parameters:
       - in: header
@@ -1868,7 +1926,7 @@ paths:
         style: simple
       responses:
         '200':
-          description: Invite resent successfully.
+          description: Invite resent successfully. The invite returns to a pending status and its expiration is extended to 7 days from now.
           content:
             application/json:
               schema:
@@ -1935,7 +1993,7 @@ paths:
                   value:
                     error:
                       code: ALREADY_EXISTS
-                      message: A pending invite already exists for this email.
+                      message: A pending invite already exists for this email; its ID is 9c8e3528-b9c0-4358-84ce-84c28e91b566.
                     status: 409
                 already-member:
                   summary: 'Invite rejected: email already belongs to an org member'
@@ -1943,6 +2001,34 @@ paths:
                     error:
                       code: ALREADY_EXISTS
                       message: This email already belongs to a member of the organization.
+                    status: 409
+                duplicate-role-binding:
+                  summary: 'Role binding rejected: identical binding already exists'
+                  value:
+                    error:
+                      code: ALREADY_EXISTS
+                      message: A role binding with these attributes already exists.
+                    status: 409
+                binding-to-processed-invite:
+                  summary: 'Role binding rejected: invite already accepted'
+                  value:
+                    error:
+                      code: ALREADY_EXISTS
+                      message: The invite has already been accepted; manage role bindings on the resulting user instead.
+                    status: 409
+                last-org-membership-binding:
+                  summary: Cannot remove the last organization-membership binding for a user
+                  value:
+                    error:
+                      code: ABORTED
+                      message: Cannot delete the last organization-membership role binding for this user.
+                    status: 409
+                invite-membership-binding:
+                  summary: Cannot remove the last organization-membership binding for a pending invite
+                  value:
+                    error:
+                      code: ABORTED
+                      message: Cannot delete the last organization-membership role binding for a pending invite; delete the invite instead.
                     status: 409
         '429':
           description: Rate limit exceeded. The org has sent the maximum number of invite emails for the current hour.
@@ -1975,9 +2061,7 @@ paths:
       tags:
       - Service Accounts
       summary: List service accounts
-      description: |
-        List service accounts in the caller's organization. Results are paginated. See query parameters for cursor rules.
-        Role bindings are not included. Use `GET /admin/role-bindings` with `principal_type` and `principal_id` to list them.
+      description: List service accounts in the caller's organization.
       operationId: list_service_accounts
       parameters:
       - in: header
@@ -2005,7 +2089,7 @@ paths:
         style: form
       responses:
         '200':
-          description: A paginated list of service accounts.
+          description: A paginated list of service accounts. Role bindings are not included; use `GET /admin/role-bindings` to list them.
           content:
             application/json:
               schema:
@@ -2069,9 +2153,7 @@ paths:
       - Service Accounts
       summary: Create a service account
       description: |
-        Create a service account with optional initial role bindings. The `client_secret` in the response is shown only once; store it securely.
-        Grant roles with `role_bindings`: `organization`-scoped bindings omit `resource_id`, while `project`-scoped bindings include the project `resource_id`. Service accounts may receive any organization- or project-scoped role (see Role). Bindings are not returned in the response.
-        Repeating the same request may create duplicate service accounts.
+        Create a service account with optional initial role bindings; the client secret is returned only once.
       operationId: create_service_account
       parameters:
       - in: header
@@ -2083,7 +2165,7 @@ paths:
           type: string
         style: simple
       requestBody:
-        description: The service account to create.
+        description: The service account to create. Repeating this request may create duplicate service accounts.
         content:
           application/json:
             schema:
@@ -2107,7 +2189,7 @@ paths:
         required: true
       responses:
         '201':
-          description: Service account created.
+          description: Service account created. Role bindings are not returned here; use `GET /admin/role-bindings` to list them.
           content:
             application/json:
               schema:
@@ -2172,8 +2254,7 @@ paths:
       - Service Accounts
       summary: Get service account details
       description: |
-        Get a service account by its ID. Returns `404` if the service account is not in your organization. The `client_secret` is not included.
-        Role bindings are not included. Use `GET /admin/role-bindings` with `principal_type` and `principal_id` to list them. Secrets are returned only from create and rotate-secret requests.
+        Get a service account by ID; the client secret is returned only from create and rotate-secret requests.
       operationId: fetch_service_account
       parameters:
       - in: header
@@ -2194,7 +2275,7 @@ paths:
         style: simple
       responses:
         '200':
-          description: The service account details (without the client secret).
+          description: The service account details (without the client secret). Role bindings are not included; use `GET /admin/role-bindings` to list them.
           content:
             application/json:
               schema:
@@ -2250,8 +2331,7 @@ paths:
       - Service Accounts
       summary: Delete a service account
       description: |
-        Delete a service account and its role bindings. Returns `202`; the service account is then no longer returned by get requests (returns `404`).
-        OAuth tokens minted by the service account are revoked within a few seconds.
+        Delete a service account and its role bindings; tokens it minted are revoked within a few seconds.
       operationId: delete_service_account
       parameters:
       - in: header
@@ -2272,7 +2352,7 @@ paths:
         style: simple
       responses:
         '202':
-          description: Service account deletion request accepted.
+          description: Service account deletion request accepted. The service account and its role bindings are removed immediately; it then returns 404, and repeating the request returns 404 as well.
         '401':
           description: 'Unauthorized. Possible causes: Invalid API key.'
           content:
@@ -2324,8 +2404,7 @@ paths:
       - Service Accounts
       summary: Update a service account
       description: |
-        Update a service account's mutable metadata. Only `name` is supported as a mutable field; fields that are omitted are left unchanged.
-        Role bindings cannot be updated here; use the role binding endpoints to create or delete bindings.
+        Update a service account's name; role bindings are managed through the role-binding endpoints.
       operationId: update_service_account
       parameters:
       - in: header
@@ -2424,8 +2503,7 @@ paths:
       - Service Accounts
       summary: Rotate a service account's OAuth client secret
       description: |
-        Rotate the OAuth `client_secret` for a service account. The previous secret and tokens minted from it are revoked within a few seconds. The new secret is returned only in this response.
-        Repeating the request may rotate again and invalidate the previous new secret.
+        Rotate a service account's OAuth client secret; the previous secret and its tokens are revoked within seconds and the new secret is returned only once.
       operationId: rotate_service_account_secret
       parameters:
       - in: header
@@ -2446,7 +2524,7 @@ paths:
         style: simple
       responses:
         '200':
-          description: Secret rotated successfully. The new `client_secret` is in the response body and is returned exactly once.
+          description: Secret rotated successfully. The new `client_secret` is in the response body and is returned exactly once. Repeating the request rotates again and invalidates the previously returned secret.
           content:
             application/json:
               schema:
@@ -2503,8 +2581,7 @@ paths:
       - Role Bindings
       summary: List role bindings
       description: |
-        List role bindings in the organization. Results are paginated.
-        Optional filters are described in the query parameters. Filters are combined with AND. Pagination tokens apply to the full query (including all filters).
+        List role bindings in the caller's organization, optionally filtered by principal, resource, and role.
       operationId: list_role_bindings
       parameters:
       - in: header
@@ -2594,7 +2671,7 @@ paths:
         style: form
       responses:
         '200':
-          description: A paginated list of role bindings.
+          description: A paginated list of role bindings. When multiple filters are supplied, they are combined with AND.
           content:
             application/json:
               schema:
@@ -2673,8 +2750,6 @@ paths:
       summary: Create a role binding
       description: |
         Grant a role to a principal at an organization or project scope.
-        Set `resource_type` to select the scope. For `project` scope, `resource_id` is required and must be the project UUID. For `organization` scope, omit `resource_id`; the binding applies to the caller's organization.
-        Returns `409` if an identical binding already exists, or if the target principal is an invite that has already been accepted (processed).
       operationId: create_role_binding
       parameters:
       - in: header
@@ -2788,7 +2863,7 @@ paths:
                   value:
                     error:
                       code: ALREADY_EXISTS
-                      message: A pending invite already exists for this email.
+                      message: A pending invite already exists for this email; its ID is 9c8e3528-b9c0-4358-84ce-84c28e91b566.
                     status: 409
                 already-member:
                   summary: 'Invite rejected: email already belongs to an org member'
@@ -2796,6 +2871,34 @@ paths:
                     error:
                       code: ALREADY_EXISTS
                       message: This email already belongs to a member of the organization.
+                    status: 409
+                duplicate-role-binding:
+                  summary: 'Role binding rejected: identical binding already exists'
+                  value:
+                    error:
+                      code: ALREADY_EXISTS
+                      message: A role binding with these attributes already exists.
+                    status: 409
+                binding-to-processed-invite:
+                  summary: 'Role binding rejected: invite already accepted'
+                  value:
+                    error:
+                      code: ALREADY_EXISTS
+                      message: The invite has already been accepted; manage role bindings on the resulting user instead.
+                    status: 409
+                last-org-membership-binding:
+                  summary: Cannot remove the last organization-membership binding for a user
+                  value:
+                    error:
+                      code: ABORTED
+                      message: Cannot delete the last organization-membership role binding for this user.
+                    status: 409
+                invite-membership-binding:
+                  summary: Cannot remove the last organization-membership binding for a pending invite
+                  value:
+                    error:
+                      code: ABORTED
+                      message: Cannot delete the last organization-membership role binding for a pending invite; delete the invite instead.
                     status: 409
         4XX:
           description: Unexpected error on request.
@@ -2823,7 +2926,7 @@ paths:
       - Role Bindings
       summary: Get role binding details
       description: |
-        Get a role binding by ID. Returns `404` if the binding is not in your organization.
+        Get a role binding in the caller's organization by ID.
       operationId: fetch_role_binding
       parameters:
       - in: header
@@ -2900,17 +3003,7 @@ paths:
       - Role Bindings
       summary: Delete a role binding
       description: |
-        Delete a role binding. Permissions are revoked when the deletion completes.
-        Returns `202`. The binding is removed immediately, so it no longer appears in list or get requests and instead returns `404`. A repeat delete request for the same binding returns `404`.
-        Returns `409` when deleting:
-        - The last `OrgOwner` binding for a user in the organization.
-        - The last organization-membership role binding for a user who still has
-
-          other role bindings.
-
-        - The last organization-membership role binding for a pending invite
-
-          (delete the invite instead).
+        Delete a role binding; permissions are revoked when the deletion completes.
       operationId: delete_role_binding
       parameters:
       - in: header
@@ -2931,7 +3024,7 @@ paths:
         style: simple
       responses:
         '202':
-          description: Role binding deletion accepted.
+          description: Role binding deletion accepted. The binding is removed immediately; it then returns 404, and repeating the request returns 404 as well.
         '401':
           description: 'Unauthorized. Possible causes: Invalid API key.'
           content:
@@ -2984,7 +3077,7 @@ paths:
                   value:
                     error:
                       code: ALREADY_EXISTS
-                      message: A pending invite already exists for this email.
+                      message: A pending invite already exists for this email; its ID is 9c8e3528-b9c0-4358-84ce-84c28e91b566.
                     status: 409
                 already-member:
                   summary: 'Invite rejected: email already belongs to an org member'
@@ -2992,6 +3085,34 @@ paths:
                     error:
                       code: ALREADY_EXISTS
                       message: This email already belongs to a member of the organization.
+                    status: 409
+                duplicate-role-binding:
+                  summary: 'Role binding rejected: identical binding already exists'
+                  value:
+                    error:
+                      code: ALREADY_EXISTS
+                      message: A role binding with these attributes already exists.
+                    status: 409
+                binding-to-processed-invite:
+                  summary: 'Role binding rejected: invite already accepted'
+                  value:
+                    error:
+                      code: ALREADY_EXISTS
+                      message: The invite has already been accepted; manage role bindings on the resulting user instead.
+                    status: 409
+                last-org-membership-binding:
+                  summary: Cannot remove the last organization-membership binding for a user
+                  value:
+                    error:
+                      code: ABORTED
+                      message: Cannot delete the last organization-membership role binding for this user.
+                    status: 409
+                invite-membership-binding:
+                  summary: Cannot remove the last organization-membership binding for a pending invite
+                  value:
+                    error:
+                      code: ABORTED
+                      message: Cannot delete the last organization-membership role binding for a pending invite; delete the invite instead.
                     status: 409
         4XX:
           description: Unexpected error on request.
@@ -3196,7 +3317,7 @@ components:
           minLength: 1
           maxLength: 80
         role_bindings:
-          description: Optional initial role bindings. Omitting the field or passing an empty array creates the service account with no role bindings; roles can be added later via the role binding endpoints. Not returned in the response.
+          description: Optional initial role bindings. Omitting the field or passing an empty array creates the service account with no role bindings; roles can be added later via the role binding endpoints. A service account may be granted any organization- or project-scoped role. Not returned in the response.
           type: array
           items:
             $ref: '#/components/schemas/RoleBindingInput'
@@ -3825,10 +3946,10 @@ tags:
 - name: Projects
   description: Actions that manage projects.
 - name: Users
-  description: Actions that manage users.
+  description: Actions that manage users. Role bindings are not included in user responses; use the Role Bindings endpoints to view them.
 - name: Invites
-  description: Actions that manage invites.
+  description: Actions that manage invites. An invite's role bindings are first-class and appear in the Role Bindings endpoints with `principal_type=invite`.
 - name: Service Accounts
-  description: Actions that manage service accounts.
+  description: Actions that manage service accounts. Role bindings are not included in service account responses; use the Role Bindings endpoints to view them.
 - name: Role Bindings
   description: Actions that manage role bindings.
