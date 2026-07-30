@@ -144,7 +144,10 @@ paths:
       tags:
       - Manage Indexes
       summary: Create an index
-      description: "Create a Pinecone index. This is where you specify the measure of similarity, the dimension of vectors to be stored in the index, which cloud provider you would like to deploy with, and more.\n  \nFor guidance and examples, see [Create an index](https://docs.pinecone.io/guides/index-data/create-an-index).\n"
+      description: |
+        Create a Pinecone index. This is where you specify the measure of similarity, the dimension of vectors to be stored in the index, which cloud provider you would like to deploy with, and more.
+        To restore from a backup, set `spec.serverless.source_backup_id` and specify the target `cloud` and `region`. Same-cloud cross-region restore is supported when available for the backup's source region. Cross-cloud restore is not supported.
+        For guidance and examples, see [Create an index](https://docs.pinecone.io/guides/index-data/create-an-index).
       operationId: create_index
       parameters:
       - in: header
@@ -207,6 +210,17 @@ paths:
                           scaling: Manual
                         mode: Dedicated
                       region: us-east1
+              serverless-restore-from-backup:
+                summary: Restoring a serverless index from a backup in another region
+                value:
+                  dimension: 3
+                  metric: cosine
+                  name: xr-restore-test
+                  spec:
+                    serverless:
+                      cloud: aws
+                      region: us-west-2
+                      source_backup_id: 670e8400-e29b-41d4-a716-446655440000
               pod-index:
                 summary: Creating a pod-based index
                 value:
@@ -292,19 +306,40 @@ paths:
                       message: Increase your quota or upgrade to create more indexes.
                     status: 403
         '404':
-          description: Unknown cloud or region when creating a serverless index.
+          description: A resource required to create the index was not found. This includes an unknown cloud or region for serverless indexes, or a backup ID that does not exist when `spec.serverless.source_backup_id` is set.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               examples:
                 serverless-spec-cloud-not-found:
-                  summary: Cannot create serverless index with invalid spec.
+                  summary: Unknown cloud or region when creating a serverless index.
                   value:
                     error:
                       code: NOT_FOUND
                       message: 'Resource cloud: aws region: us-west1 not found.'
                     status: 404
+                backup-not-found:
+                  summary: Backup not found when restoring from source_backup_id.
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Backup bkp_123abc not found.
+                    status: 404
+        '412':
+          description: Cross-region restore is not available for the backup's source region.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                cross-region-restore-unavailable:
+                  summary: Cross-region restore is not yet available for the source region.
+                  value:
+                    error:
+                      code: FAILED_PRECONDITION
+                      message: Cross-region restore is not yet available for aws/us-east-1
+                    status: 412
         '422':
           description: Unprocessable entity. The request body could not be deserialized.
           content:
@@ -760,7 +795,9 @@ paths:
       tags:
       - Manage Indexes
       summary: List backups for an index
-      description: List all backups for an index.
+      description: |-
+        When `include_deleted` is false (or omitted), `index_name` must resolve to an active index in the project. If no active index by that name exists—including the case where only deleted indexes have used the name—the API returns **404**, not an empty list.
+        When `include_deleted` is true, the API returns backups from every index in the project that has ever used this name (active and deleted). The `source_index_deleted_at` field is present only when the backup is from a deleted index. **404** is returned only when no index by that name has ever existed in the project (active or deleted).
       operationId: list_index_backups
       parameters:
       - in: header
@@ -773,11 +810,18 @@ paths:
         style: simple
       - in: path
         name: index_name
-        description: Name of the backed up index
+        description: Name of the index whose backups are listed. When `include_deleted` is false or omitted, this must resolve to an active index in the project.
         required: true
         schema:
           type: string
         style: simple
+      - in: query
+        name: include_deleted
+        description: When true, includes backups for every index incarnation with this name (active and deleted). When false or omitted, only the active index’s backups are included; **404** when no active index has that name.
+        schema:
+          default: false
+          type: boolean
+        style: form
       - in: query
         name: limit
         description: The number of results to return per page.
@@ -795,14 +839,14 @@ paths:
         style: form
       responses:
         '200':
-          description: This operation returns a list of all the backups that you have previously created, and which are associated with the given index.
+          description: Returns backups associated with the index name. With `include_deleted` true, backups for all versions of the index name are returned. With `include_deleted` false, only backups for the active index are returned, or **404** if there is no active index.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BackupList'
               examples:
-                backups:
-                  summary: A list containing backups.
+                active_index_backups:
+                  summary: Backups for the active index only (`include_deleted` false or omitted).
                   value:
                     data:
                     - backup_id: bkp_123abc
@@ -838,12 +882,6 @@ paths:
                       namespace_count: 4
                       record_count: 125000
                       region: us-east-1
-                      schema:
-                        fields:
-                          genre:
-                            filterable: true
-                          title:
-                            filterable: true
                       size_bytes: 10500000
                       source_index_id: idx_456
                       source_index_name: my-index
@@ -851,6 +889,73 @@ paths:
                       tags:
                         environment: production
                         type: pre-deploy
+                    pagination:
+                      next: dXNlcl9pZD11c2VyXzE=
+                include_deleted_backups:
+                  summary: Backups from active and deleted indexes with the same name (`include_deleted` true).
+                  value:
+                    data:
+                    - backup_id: bkp_123abc
+                      cloud: aws
+                      created_at: 2024-03-15T10:30:00Z
+                      description: Monthly backup of production index
+                      dimension: 1536
+                      metric: cosine
+                      name: backup_2024_03_15
+                      namespace_count: 3
+                      record_count: 120000
+                      region: us-east-1
+                      schema:
+                        fields:
+                          genre:
+                            filterable: true
+                          title:
+                            filterable: true
+                      size_bytes: 10000000
+                      source_index_id: idx_456
+                      source_index_name: my-index
+                      status: Ready
+                      tags:
+                        environment: production
+                        type: monthly
+                    - backup_id: bkp_789xyz
+                      cloud: aws
+                      created_at: 2024-03-20T15:45:00Z
+                      description: Pre-deployment safety backup
+                      dimension: 1536
+                      metric: cosine
+                      name: backup_2024_03_20
+                      namespace_count: 4
+                      record_count: 125000
+                      region: us-east-1
+                      size_bytes: 10500000
+                      source_index_id: idx_456
+                      source_index_name: my-index
+                      status: Ready
+                      tags:
+                        environment: production
+                        type: pre-deploy
+                    - backup_id: bkp_oldidx
+                      cloud: aws
+                      created_at: 2024-03-01T09:00:00Z
+                      description: Backup from a since-deleted index with the same name
+                      dimension: 1536
+                      metric: cosine
+                      name: backup_before_rename
+                      namespace_count: 2
+                      record_count: 100000
+                      region: us-east-1
+                      schema:
+                        fields:
+                          genre:
+                            filterable: true
+                      size_bytes: 9000000
+                      source_index_deleted_at: 2024-03-05T12:00:00Z
+                      source_index_id: idx_legacy
+                      source_index_name: my-index
+                      status: Ready
+                      tags:
+                        environment: production
                     pagination:
                       next: dXNlcl9pZD11c2VyXzE=
         '401':
@@ -1001,6 +1106,284 @@ paths:
                       code: FORBIDDEN
                       message: Increase your quota or upgrade to create more backups.
                     status: 403
+        '422':
+          description: Unprocessable entity. The request body could not be deserialized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missing-field:
+                  summary: Unprocessable entity
+                  value:
+                    error:
+                      code: UNPROCESSABLE_ENTITY
+                      message: 'Failed to deserialize the JSON body into the target type: missing field `metric` at line 1 column 16'
+                    status: 422
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+  /indexes/{index_name}/backup-schedules:
+    get:
+      tags:
+      - Manage Indexes
+      summary: List backup schedules for an index
+      description: Return backup schedules associated with the given index.
+      operationId: list_backup_schedules
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2026-04
+          type: string
+        style: simple
+      - in: path
+        name: index_name
+        description: Name of the index whose backup schedules are listed.
+        required: true
+        schema:
+          type: string
+        style: simple
+      - in: query
+        name: limit
+        description: The number of results to return per page.
+        schema:
+          default: 10
+          type: integer
+          minimum: 1
+          maximum: 100
+        style: form
+      - in: query
+        name: paginationToken
+        description: The token to use to retrieve the next page of results.
+        schema:
+          type: string
+        style: form
+      responses:
+        '200':
+          description: Backup schedules for the index.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackupScheduleList'
+              examples:
+                schedules:
+                  summary: Single schedule on the index
+                  value:
+                    data:
+                    - created_at: 2026-04-02T18:22:56.712605+00:00
+                      enabled: true
+                      frequency: daily
+                      index_id: 8cbf7ba6-4135-438e-a3c3-4a89a3298905
+                      name: daily-compliance-backup
+                      next_scheduled_run: 2026-04-03T06:00:00+00:00
+                      project_id: 71ce31ea-75f7-45d6-a147-ef67f661a1b0
+                      retention_expire_after_days: 90
+                      schedule_id: e88f7273-42aa-47e9-af73-593827136867
+                      schedule_type: time-based
+                empty:
+                  summary: No schedules configured
+                  value:
+                    data: []
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '403':
+          description: Scheduled backups are not available for the caller's plan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                scheduled-backups-plan:
+                  summary: Scheduled backups not enabled for plan
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: Scheduled backups are not available for your plan
+                    status: 403
+        '404':
+          description: Index not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                index-not-found:
+                  summary: Index not found
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Index example-index not found.
+                    status: 404
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+    post:
+      tags:
+      - Manage Indexes
+      summary: Create a backup schedule for an index
+      description: Create a time-based backup schedule for the specified index.
+      operationId: create_backup_schedule
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2026-04
+          type: string
+        style: simple
+      - in: path
+        name: index_name
+        description: Name of the index to attach the backup schedule to.
+        required: true
+        schema:
+          type: string
+        style: simple
+      requestBody:
+        description: Schedule name, cadence, and retention for automatic backups.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBackupScheduleRequest'
+            examples:
+              daily-schedule:
+                summary: Daily backup with 90-day retention
+                value:
+                  name: daily-compliance-backup
+                  retention:
+                    expire_after_days: 90
+                  schedule:
+                    frequency: daily
+                    type: time-based
+        required: true
+      responses:
+        '201':
+          description: The backup schedule was created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackupScheduleResponse'
+              examples:
+                created:
+                  summary: New backup schedule
+                  value:
+                    created_at: 2026-04-02T18:22:56.712605+00:00
+                    enabled: true
+                    frequency: daily
+                    index_id: 8cbf7ba6-4135-438e-a3c3-4a89a3298905
+                    name: daily-compliance-backup
+                    next_scheduled_run: 2026-04-03T06:00:00+00:00
+                    project_id: 71ce31ea-75f7-45d6-a147-ef67f661a1b0
+                    retention_expire_after_days: 90
+                    schedule_id: e88f7273-42aa-47e9-af73-593827136867
+                    schedule_type: time-based
+        '400':
+          description: Bad request. The request body included invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                index-metric-validation-error:
+                  summary: Validation error
+                  value:
+                    error:
+                      code: INVALID_ARGUMENT
+                      message: Bad request. The request body included invalid request parameters.
+                    status: 400
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '403':
+          description: Scheduled backups are not available for the caller's plan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                scheduled-backups-plan:
+                  summary: Scheduled backups not enabled for plan
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: Scheduled backups are not available for your plan
+                    status: 403
+        '404':
+          description: Index not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                index-not-found:
+                  summary: Index not found
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Index example-index not found.
+                    status: 404
+        '409':
+          description: The index already has an enabled backup schedule.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                schedule-already-exists:
+                  summary: Index already has an enabled schedule
+                  value:
+                    error:
+                      code: ALREADY_EXISTS
+                      message: This index already has an enabled backup schedule. Disable or delete it first.
+                    status: 409
         '422':
           description: Unprocessable entity. The request body could not be deserialized.
           content:
@@ -1673,7 +2056,7 @@ paths:
       tags:
       - Manage Indexes
       summary: Create an index from a backup
-      description: Create an index from a backup.
+      description: Create an index from a backup. For serverless backups, you can optionally set `read_capacity` so the restored index is created with dedicated read nodes (DRN) instead of defaulting to on-demand capacity.
       operationId: create_index_from_backup_operation
       parameters:
       - in: header
@@ -1698,6 +2081,23 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CreateIndexFromBackupRequest'
+            examples:
+              on-demand:
+                summary: Restore with on-demand read capacity (default)
+                value:
+                  name: restored-index
+              dedicated:
+                summary: Restore directly onto dedicated read nodes
+                value:
+                  name: restored-drn-index
+                  read_capacity:
+                    dedicated:
+                      manual:
+                        replicas: 2
+                        shards: 2
+                      node_type: t1
+                      scaling: Manual
+                    mode: Dedicated
         required: true
       responses:
         '202':
@@ -1796,6 +2196,471 @@ paths:
                       code: UNPROCESSABLE_ENTITY
                       message: 'Failed to deserialize the JSON body into the target type: missing field `metric` at line 1 column 16'
                     status: 422
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+  /backup-schedules/{schedule_id}:
+    get:
+      tags:
+      - Manage Indexes
+      summary: Describe a backup schedule
+      description: Get a single backup schedule by ID.
+      operationId: describe_backup_schedule
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2026-04
+          type: string
+        style: simple
+      - in: path
+        name: schedule_id
+        description: The ID of the backup schedule.
+        required: true
+        schema:
+          type: string
+        example: e88f7273-42aa-47e9-af73-593827136867
+        style: simple
+      responses:
+        '200':
+          description: The backup schedule configuration and metadata.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackupScheduleResponse'
+              examples:
+                schedule:
+                  summary: Active daily schedule
+                  value:
+                    created_at: 2026-04-02T18:22:56.712605+00:00
+                    enabled: true
+                    frequency: daily
+                    index_id: 8cbf7ba6-4135-438e-a3c3-4a89a3298905
+                    name: daily-compliance-backup
+                    next_scheduled_run: 2026-04-03T06:00:00+00:00
+                    project_id: 71ce31ea-75f7-45d6-a147-ef67f661a1b0
+                    retention_expire_after_days: 90
+                    schedule_id: e88f7273-42aa-47e9-af73-593827136867
+                    schedule_type: time-based
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '403':
+          description: Scheduled backups are not available for the caller's plan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                scheduled-backups-plan:
+                  summary: Scheduled backups not enabled for plan
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: Scheduled backups are not available for your plan
+                    status: 403
+        '404':
+          description: Backup schedule not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                schedule-not-found:
+                  summary: Backup schedule not found
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Backup schedule not found.
+                    status: 404
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+    delete:
+      tags:
+      - Manage Indexes
+      summary: Delete a backup schedule
+      description: Permanently remove a backup schedule.
+      operationId: delete_backup_schedule
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2026-04
+          type: string
+        style: simple
+      - in: path
+        name: schedule_id
+        description: The ID of the backup schedule to delete.
+        required: true
+        schema:
+          type: string
+        example: e88f7273-42aa-47e9-af73-593827136867
+        style: simple
+      responses:
+        '204':
+          description: The backup schedule was deleted. No response body is returned.
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '403':
+          description: Scheduled backups are not available for the caller's plan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                scheduled-backups-plan:
+                  summary: Scheduled backups not enabled for plan
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: Scheduled backups are not available for your plan
+                    status: 403
+        '404':
+          description: Backup schedule not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                schedule-not-found:
+                  summary: Backup schedule not found
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Backup schedule not found.
+                    status: 404
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+    patch:
+      tags:
+      - Manage Indexes
+      summary: Update a backup schedule
+      description: |-
+        Update frequency, retention, or enabled state for a backup schedule.
+        Re-enabling a disabled schedule (`enabled: true`) enqueues a new backup operation.
+      operationId: update_backup_schedule
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2026-04
+          type: string
+        style: simple
+      - in: path
+        name: schedule_id
+        description: The ID of the backup schedule to update.
+        required: true
+        schema:
+          type: string
+        example: e88f7273-42aa-47e9-af73-593827136867
+        style: simple
+      requestBody:
+        description: Fields to update. Omitted fields are unchanged.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBackupScheduleRequest'
+            examples:
+              update-frequency-retention-disable:
+                summary: Weekly cadence, shorter retention, disable schedule
+                value:
+                  enabled: false
+                  frequency: weekly
+                  retention:
+                    expire_after_days: 30
+        required: true
+      responses:
+        '200':
+          description: The updated backup schedule.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackupScheduleResponse'
+              examples:
+                updated:
+                  summary: Schedule after update
+                  value:
+                    created_at: 2026-04-02T18:22:56.712605+00:00
+                    enabled: false
+                    frequency: weekly
+                    index_id: 8cbf7ba6-4135-438e-a3c3-4a89a3298905
+                    name: daily-compliance-backup
+                    project_id: 71ce31ea-75f7-45d6-a147-ef67f661a1b0
+                    retention_expire_after_days: 30
+                    schedule_id: e88f7273-42aa-47e9-af73-593827136867
+                    schedule_type: time-based
+        '400':
+          description: Bad request. The request body included invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                index-metric-validation-error:
+                  summary: Validation error
+                  value:
+                    error:
+                      code: INVALID_ARGUMENT
+                      message: Bad request. The request body included invalid request parameters.
+                    status: 400
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '403':
+          description: Scheduled backups are not available for the caller's plan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                scheduled-backups-plan:
+                  summary: Scheduled backups not enabled for plan
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: Scheduled backups are not available for your plan
+                    status: 403
+        '404':
+          description: Backup schedule not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                schedule-not-found:
+                  summary: Backup schedule not found
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Backup schedule not found.
+                    status: 404
+        '422':
+          description: Unprocessable entity. The request body could not be deserialized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missing-field:
+                  summary: Unprocessable entity
+                  value:
+                    error:
+                      code: UNPROCESSABLE_ENTITY
+                      message: 'Failed to deserialize the JSON body into the target type: missing field `metric` at line 1 column 16'
+                    status: 422
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+  /backup-schedules/{schedule_id}/history:
+    get:
+      tags:
+      - Manage Indexes
+      summary: List backup history for a schedule
+      description: Return backups that were created by the specified backup schedule.
+      operationId: list_backup_schedule_history
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2026-04
+          type: string
+        style: simple
+      - in: path
+        name: schedule_id
+        description: The ID of the backup schedule.
+        required: true
+        schema:
+          type: string
+        example: e88f7273-42aa-47e9-af73-593827136867
+        style: simple
+      - in: query
+        name: limit
+        description: The number of results to return per page.
+        schema:
+          default: 10
+          type: integer
+          minimum: 1
+          maximum: 100
+        style: form
+      - in: query
+        name: paginationToken
+        description: The token to use to retrieve the next page of results.
+        schema:
+          type: string
+        style: form
+      responses:
+        '200':
+          description: Backups produced by this schedule.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackupScheduleHistoryList'
+              examples:
+                history:
+                  summary: Ready backup and paginated final page
+                  value:
+                    data:
+                    - backup_id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+                      cloud: aws
+                      created_at: 2026-04-03T06:00:00+00:00
+                      dimension: 1536
+                      metric: cosine
+                      name: daily-compliance-backup-20260403T060000Z
+                      namespace_count: 1
+                      record_count: 500000
+                      region: us-east-1
+                      size_bytes: 104857600
+                      source_index_id: 8cbf7ba6-4135-438e-a3c3-4a89a3298905
+                      source_index_name: my-index
+                      status: Ready
+                scheduled-row:
+                  summary: Backup waiting to run
+                  value:
+                    data:
+                    - backup_id: b2c3d4e5-f6a7-8901-bcde-f12345678901
+                      cloud: aws
+                      created_at: 2026-04-03T06:00:01+00:00
+                      dimension: 1536
+                      metric: cosine
+                      name: daily-compliance-backup-20260404T060000Z
+                      namespace_count: 0
+                      record_count: 0
+                      region: us-east-1
+                      scheduled_execution_at: 2026-04-04T06:00:00+00:00
+                      size_bytes: 0
+                      source_index_id: 8cbf7ba6-4135-438e-a3c3-4a89a3298905
+                      source_index_name: my-index
+                      status: Scheduled
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '403':
+          description: Scheduled backups are not available for the caller's plan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                scheduled-backups-plan:
+                  summary: Scheduled backups not enabled for plan
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: Scheduled backups are not available for your plan
+                    status: 403
+        '404':
+          description: Backup schedule not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                schedule-not-found:
+                  summary: Backup schedule not found
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Backup schedule not found.
+                    status: 404
         '500':
           description: Internal server error.
           content:
@@ -2137,87 +3002,464 @@ paths:
                     status: 500
 components:
   schemas:
-    CreateIndexFromBackupRequest:
-      description: The configuration needed to create a Pinecone index from a backup.
+    BackupList:
+      description: The list of backups that exist in the project.
+      type: object
+      properties:
+        data:
+          description: List of backup objects
+          type: array
+          items:
+            $ref: '#/components/schemas/BackupModel'
+        pagination:
+          nullable: true
+          description: Cursor envelope for the next page. `null` (or absent) on the final page of results.
+          type: object
+          allOf:
+          - example:
+              next: dXNlcl9pZD11c2VyXzE=
+            description: The pagination object that is returned with paginated responses.
+            x-component-name: PaginationResponse
+            type: object
+            properties:
+              next:
+                example: dXNlcl9pZD11c2VyXzE=
+                description: The token to use to retrieve the next page of results.
+                type: string
+            required:
+            - next
+    BackupModel:
+      description: The BackupModel describes the configuration and status of a Pinecone backup.
+      type: object
+      properties:
+        backup_id:
+          example: 670e8400-e29b-41d4-a716-446655440001
+          description: Unique identifier for the backup.
+          type: string
+        source_index_name:
+          example: my-index
+          description: Name of the index from which the backup was taken.
+          type: string
+        source_index_id:
+          example: 670e8400-e29b-41d4-a716-446655440000
+          description: ID of the index.
+          type: string
+        source_index_deleted_at:
+          example: 2024-03-05T12:00:00Z
+          description: The deletion timestamp when the source index has been deleted. Not present for backups associated with an active index.
+          type: string
+          format: date-time
+        name:
+          example: backup-2025-02-04
+          description: Optional user-defined name for the backup.
+          type: string
+        description:
+          example: Backup before bulk update.
+          description: Optional description providing context for the backup.
+          type: string
+        status:
+          example: Ready
+          description: Current status of the backup (e.g., Initializing, Ready, Failed).
+          type: string
+        cloud:
+          example: aws
+          description: Cloud provider where the backup is stored.
+          type: string
+        region:
+          example: us-east-1
+          description: Cloud region where the backup is stored.
+          type: string
+        dimension:
+          example: 1536
+          description: The dimensions of the vectors to be inserted in the index.
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 20000
+        metric:
+          description: |-
+            The distance metric to be used for similarity search. You can use 'euclidean', 'cosine', or 'dotproduct'. If the 'vector_type' is 'sparse', the metric must be 'dotproduct'. If the `vector_type` is `dense`, the metric defaults to 'cosine'.
+            Possible values: `cosine`, `euclidean`, or `dotproduct`.
+          x-enum:
+          - cosine
+          - euclidean
+          - dotproduct
+          type: string
+        schema:
+          $ref: '#/components/schemas/MetadataSchema'
+        record_count:
+          example: 120000
+          description: Total number of records in the backup.
+          type: integer
+        namespace_count:
+          example: 3
+          description: Number of namespaces in the backup.
+          type: integer
+        size_bytes:
+          example: 10000000
+          description: Size of the backup in bytes.
+          type: integer
+        tags:
+          $ref: '#/components/schemas/IndexTags'
+        created_at:
+          description: Timestamp when the backup was created.
+          type: string
+      required:
+      - backup_id
+      - source_index_name
+      - source_index_id
+      - status
+      - cloud
+      - region
+    BackupScheduleHistoryItem:
+      description: A backup produced by a schedule, including lifecycle status. When `status` is `Scheduled`, `scheduled_execution_at` is set to the planned run time.
+      type: object
+      properties:
+        backup_id:
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+          description: Unique identifier for the backup.
+          type: string
+        source_index_id:
+          example: 8cbf7ba6-4135-438e-a3c3-4a89a3298905
+          description: ID of the index from which the backup was taken.
+          type: string
+        source_index_name:
+          example: my-index
+          description: Name of the index from which the backup was taken.
+          type: string
+        tags:
+          nullable: true
+          description: Custom user tags on this backup snapshot. Keys must be 80 characters or less. Values must be 120 characters or less. Keys must be alphanumeric, '_', or '-'. Values must be alphanumeric, ';', '@', '_', '-', '.', '+', or ' '. To unset a key, set the value to be an empty string. `null` when no tags are set.
+          type: object
+          additionalProperties:
+            type: string
+        name:
+          example: daily-compliance-backup-20260403T060000Z
+          description: Name of the backup.
+          type: string
+        description:
+          nullable: true
+          description: Optional description of the backup, or `null`.
+          type: string
+        status:
+          example: Ready
+          description: Current lifecycle status of the backup.
+          x-enum:
+          - Scheduled
+          - Initializing
+          - Ready
+          - InitializationFailed
+          type: string
+        cloud:
+          example: aws
+          description: Cloud provider where the backup is stored.
+          type: string
+        region:
+          example: us-east-1
+          description: Cloud region where the backup is stored.
+          type: string
+        dimension:
+          example: 1536
+          description: The dimensions of the vectors to be inserted in the index.
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 20000
+        metric:
+          description: |-
+            The distance metric to be used for similarity search. You can use 'euclidean', 'cosine', or 'dotproduct'. If the 'vector_type' is 'sparse', the metric must be 'dotproduct'. If the `vector_type` is `dense`, the metric defaults to 'cosine'.
+            Possible values: `cosine`, `euclidean`, or `dotproduct`.
+          x-enum:
+          - cosine
+          - euclidean
+          - dotproduct
+          type: string
+        schema:
+          nullable: true
+          description: Metadata schema associated with the backup, or `null` if not applicable.
+          allOf:
+          - $ref: '#/components/schemas/MetadataSchema'
+        record_count:
+          example: 500000
+          description: Total number of records in the backup.
+          type: integer
+          format: int64
+        namespace_count:
+          example: 1
+          description: Number of namespaces in the backup.
+          type: integer
+          format: int32
+        size_bytes:
+          example: 104857600
+          description: Approximate stored size of this scheduled-backup snapshot, in bytes.
+          type: integer
+          format: int64
+        created_at:
+          example: 2026-04-03T06:00:00+00:00
+          description: RFC 3339 timestamp when the backup record was created.
+          type: string
+          format: date-time
+        scheduled_execution_at:
+          example: 2026-04-04T06:00:00+00:00
+          description: Present when `status` is `Scheduled`. RFC 3339 timestamp when the backup is planned to run.
+          type: string
+          format: date-time
+      required:
+      - backup_id
+      - source_index_id
+      - source_index_name
+      - name
+      - status
+      - cloud
+      - region
+      - dimension
+      - metric
+      - record_count
+      - namespace_count
+      - size_bytes
+      - created_at
+    BackupScheduleHistoryList:
+      description: Paginated list of backups created by a specific backup schedule.
+      type: object
+      properties:
+        data:
+          description: Backups from this schedule for the current page.
+          type: array
+          items:
+            $ref: '#/components/schemas/BackupScheduleHistoryItem'
+        pagination:
+          nullable: true
+          description: Cursor envelope for the next page. `null` (or absent) on the final page of results.
+          type: object
+          allOf:
+          - example:
+              next: dXNlcl9pZD11c2VyXzE=
+            description: The pagination object that is returned with paginated responses.
+            x-component-name: PaginationResponse
+            type: object
+            properties:
+              next:
+                example: dXNlcl9pZD11c2VyXzE=
+                description: The token to use to retrieve the next page of results.
+                type: string
+            required:
+            - next
+      required:
+      - data
+    BackupScheduleList:
+      description: Paginated list of backup schedules for an index.
+      type: object
+      properties:
+        data:
+          description: Backup schedules returned for this page.
+          type: array
+          items:
+            $ref: '#/components/schemas/BackupScheduleResponse'
+        pagination:
+          nullable: true
+          description: Cursor envelope for the next page. `null` (or absent) on the final page of results.
+          type: object
+          allOf:
+          - example:
+              next: dXNlcl9pZD11c2VyXzE=
+            description: The pagination object that is returned with paginated responses.
+            x-component-name: PaginationResponse
+            type: object
+            properties:
+              next:
+                example: dXNlcl9pZD11c2VyXzE=
+                description: The token to use to retrieve the next page of results.
+                type: string
+            required:
+            - next
+      required:
+      - data
+    BackupScheduleRequestSchedule:
+      description: Time-based schedule configuration for automatic index backups. Only time-based schedules are supported.
+      type: object
+      properties:
+        type:
+          example: time-based
+          description: Schedule category. Only time-based schedules are supported.
+          x-enum:
+          - time-based
+          type: string
+        frequency:
+          example: daily
+          description: How often the scheduled backup runs.
+          x-enum:
+          - daily
+          - weekly
+          - monthly
+          type: string
+      required:
+      - type
+      - frequency
+      additionalProperties: false
+    BackupScheduleResponse:
+      description: Describes a backup schedule for an index.
+      type: object
+      properties:
+        schedule_id:
+          example: e88f7273-42aa-47e9-af73-593827136867
+          description: Unique identifier for the backup schedule.
+          type: string
+        name:
+          example: daily-compliance-backup
+          description: User-defined name for the backup schedule.
+          type: string
+        index_id:
+          example: 8cbf7ba6-4135-438e-a3c3-4a89a3298905
+          description: ID of the index this schedule backs up.
+          type: string
+        project_id:
+          example: 71ce31ea-75f7-45d6-a147-ef67f661a1b0
+          description: Pinecone project that contains this schedule (same project as the source index).
+          type: string
+        schedule_type:
+          example: time-based
+          description: Schedule category. Only time-based schedules are supported.
+          x-enum:
+          - time-based
+          type: string
+        frequency:
+          example: daily
+          description: How often the scheduled backup runs.
+          x-enum:
+          - daily
+          - weekly
+          - monthly
+          type: string
+        retention_expire_after_days:
+          example: 90
+          description: Number of days backups created by this schedule are retained.
+          type: integer
+          format: int32
+          minimum: 1
+        enabled:
+          example: true
+          description: Whether the schedule is active. Disabled schedules do not run.
+          type: boolean
+        next_scheduled_run:
+          nullable: true
+          example: 2026-04-03T06:00:00+00:00
+          description: Always present. RFC 3339 timestamp of the next planned backup run when `enabled` is `true`. `null` when `enabled` is `false`; no backup is scheduled until the schedule is re-enabled.
+          type: string
+          format: date-time
+        created_at:
+          example: 2026-04-02T18:22:56.712605+00:00
+          description: RFC 3339 timestamp when the schedule was created.
+          type: string
+          format: date-time
+      required:
+      - schedule_id
+      - name
+      - index_id
+      - project_id
+      - schedule_type
+      - frequency
+      - retention_expire_after_days
+      - enabled
+      - next_scheduled_run
+      - created_at
+    BackupScheduleRetentionInput:
+      description: Retention policy for backups created by this schedule. Backups older than the retention window may be removed.
+      type: object
+      properties:
+        expire_after_days:
+          example: 90
+          description: Number of days to retain each backup created by this schedule. The maximum allowed value is determined by your project configuration (`max_backup_retention_days`).
+          type: integer
+          format: int32
+          minimum: 1
+      required:
+      - expire_after_days
+      additionalProperties: false
+    ByocSpec:
+      example:
+        environment: aws-us-east-1-b921
+      title: BYOC
+      description: Configuration needed to deploy an index in a BYOC environment.
+      type: object
+      properties:
+        environment:
+          example: aws-us-east-1-b921
+          description: The environment where the index is hosted.
+          type: string
+        read_capacity:
+          $ref: '#/components/schemas/ReadCapacity'
+        schema:
+          $ref: '#/components/schemas/MetadataSchema'
+      required:
+      - environment
+    ByocSpecResponse:
+      title: BYOC
+      description: Configuration of a BYOC index.
+      type: object
+      properties:
+        environment:
+          example: aws-us-east-1-b921
+          description: The environment where the index is hosted.
+          type: string
+        read_capacity:
+          $ref: '#/components/schemas/ReadCapacityResponse'
+        schema:
+          $ref: '#/components/schemas/MetadataSchema'
+      required:
+      - environment
+      - read_capacity
+    CollectionList:
+      description: The list of collections that exist in the project.
+      type: object
+      properties:
+        collections:
+          description: List of collections in the project
+          type: array
+          items:
+            $ref: '#/components/schemas/CollectionModel'
+    CollectionModel:
+      description: The CollectionModel describes the configuration and status of a Pinecone collection.
       type: object
       properties:
         name:
-          example: example-index
-          description: |
-            The name of the index. Resource name must be 1-45 characters long, start and end with an alphanumeric character, and consist only of lower case alphanumeric characters or '-'.
+          example: example-collection
+          description: The name of the collection.
           type: string
-          minLength: 1
-          maxLength: 45
-        tags:
-          $ref: '#/components/schemas/IndexTags'
-        deletion_protection:
-          $ref: '#/components/schemas/DeletionProtection'
+        size:
+          example: 10000000
+          description: The size of the collection in bytes.
+          type: integer
+          format: int64
+        status:
+          example: Initializing
+          description: |-
+            The status of the collection.
+            Possible values: `Initializing`, `Ready`, or `Terminating`.
+          x-enum:
+          - Initializing
+          - Ready
+          - Terminating
+          type: string
+        dimension:
+          example: 1536
+          description: The dimension of the vectors stored in each record held in the collection.
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 20000
+        vector_count:
+          example: 120000
+          description: The number of records stored in the collection.
+          type: integer
+          format: int32
+        environment:
+          example: us-east1-gcp
+          description: The environment where the collection is hosted.
+          type: string
       required:
       - name
-    ReadCapacity:
-      description: By default the index will be created with read capacity  mode `OnDemand`. If you prefer to allocate dedicated read  nodes for your workload, you must specify mode `Dedicated` and additional configurations for `node_type` and `scaling`.
-      discriminator:
-        propertyName: mode
-        mapping:
-          OnDemand: '#/components/schemas/ReadCapacityOnDemandSpec'
-          Dedicated: '#/components/schemas/ReadCapacityDedicatedSpec'
-      oneOf:
-      - $ref: '#/components/schemas/ReadCapacityOnDemandSpec'
-      - $ref: '#/components/schemas/ReadCapacityDedicatedSpec'
-    MetadataSchema:
-      example:
-        fields:
-          description:
-            filterable: true
-          genre:
-            filterable: true
-          year:
-            filterable: true
-      description: 'Schema for the behavior of Pinecone''s internal metadata index. By default, all metadata is indexed; when `schema` is present, only fields which are present in the `fields` object with a `filterable: true` are indexed. Note that `filterable: false` is not currently supported.'
-      type: object
-      properties:
-        fields:
-          description: A map of metadata field names to their configuration. The field name must be a valid metadata field name. The field name must be unique.
-          type: object
-          additionalProperties:
-            type: object
-            properties:
-              filterable:
-                description: Whether the field is filterable. If true, the field is indexed and can be used in filters. Only true values are allowed.
-                type: boolean
-      required:
-      - fields
-    IndexSpec:
-      description: |
-        The spec object defines how the index should be deployed.
-
-        For serverless indexes, you define only the [cloud and region](http://docs.pinecone.io/guides/index-data/create-an-index#cloud-regions) where the index should be hosted. For pod-based indexes, you define the [environment](http://docs.pinecone.io/guides/indexes/pods/understanding-pod-based-indexes#pod-environments) where the index should be hosted, the [pod type and size](http://docs.pinecone.io/guides/indexes/pods/understanding-pod-based-indexes#pod-types) to use, and other index characteristics.
-      type: object
-      oneOf:
-      - title: Serverless
-        type: object
-        properties:
-          serverless:
-            $ref: '#/components/schemas/ServerlessSpec'
-        required:
-        - serverless
-        additionalProperties: false
-      - title: Pod-based
-        type: object
-        properties:
-          pod:
-            $ref: '#/components/schemas/PodSpec'
-        required:
-        - pod
-        additionalProperties: false
-      - title: BYOC
-        type: object
-        properties:
-          byoc:
-            $ref: '#/components/schemas/ByocSpec'
-        required:
-        - byoc
-        additionalProperties: false
+      - status
+      - environment
     ConfigureIndexRequest:
       description: Configuration used to scale an index.
       type: object
@@ -2306,40 +3548,220 @@ components:
             write_parameters:
               description: The write parameters for the embedding model.
               type: object
-    IndexTags:
-      example:
-        tag0: val0
-        tag1: val1
-      description: Custom user tags added to an index. Keys must be 80 characters or less. Values must be 120 characters or less. Keys must be alphanumeric, '_', or '-'.  Values must be alphanumeric, ';', '@', '_', '-', '.', '+', or ' '. To unset a key, set the value to be an empty string.
-      type: object
-      additionalProperties:
-        type: string
-    CollectionList:
-      description: The list of collections that exist in the project.
+    CreateBackupRequest:
+      description: The configuration needed to create a backup of an index.
       type: object
       properties:
-        collections:
-          description: List of collections in the project
-          type: array
-          items:
-            $ref: '#/components/schemas/CollectionModel'
-    ReadCapacityOnDemandSpecResponse:
-      example:
-        mode: OnDemand
-        status:
-          state: Ready
-      title: On-demand
-      type: object
-      properties:
-        mode:
-          description: 'The mode of the index. Possible values: `OnDemand` or `Dedicated`. Defaults to `OnDemand`. If set to `Dedicated`, `dedicated.node_type`, and `dedicated.scaling` must be specified.'
+        name:
+          description: The name of the backup.
           type: string
-        status:
-          $ref: '#/components/schemas/ReadCapacityStatus'
+        description:
+          description: A description of the backup.
+          type: string
+    CreateBackupScheduleRequest:
+      description: Request body for creating a backup schedule on an index.
+      type: object
+      properties:
+        name:
+          example: daily-compliance-backup
+          description: User-defined name for the backup schedule.
+          type: string
+        schedule:
+          $ref: '#/components/schemas/BackupScheduleRequestSchedule'
+        retention:
+          $ref: '#/components/schemas/BackupScheduleRetentionInput'
       required:
-      - mode
-      - status
+      - name
+      - schedule
+      - retention
       additionalProperties: false
+    CreateCollectionRequest:
+      description: The configuration needed to create a Pinecone collection.
+      type: object
+      properties:
+        name:
+          description: |
+            The name of the collection to be created. Resource name must be 1-45 characters long, start and end with an alphanumeric character, and consist only of lower case alphanumeric characters or '-'.
+          type: string
+          minLength: 1
+          maxLength: 45
+        source:
+          example: example-source-index
+          description: The name of the index to be used as the source for the collection.
+          type: string
+      required:
+      - name
+      - source
+    CreateIndexForModelRequest:
+      description: The desired configuration for the index and associated embedding model.
+      type: object
+      properties:
+        name:
+          example: example-index
+          description: |
+            The name of the index. Resource name must be 1-45 characters long, start and end with an alphanumeric character, and consist only of lower case alphanumeric characters or '-'.
+          type: string
+          minLength: 1
+          maxLength: 45
+        cloud:
+          example: aws
+          description: |-
+            The public cloud where you would like your index hosted.
+            Possible values: `gcp`, `aws`, or `azure`.
+          x-enum:
+          - gcp
+          - aws
+          - azure
+          type: string
+        region:
+          example: us-east-1
+          description: The region where you would like your index to be created.
+          type: string
+        deletion_protection:
+          $ref: '#/components/schemas/DeletionProtection'
+        tags:
+          $ref: '#/components/schemas/IndexTags'
+        schema:
+          $ref: '#/components/schemas/MetadataSchema'
+        read_capacity:
+          $ref: '#/components/schemas/ReadCapacity'
+        embed:
+          example:
+            field_map:
+              text: your-text-field
+            metric: cosine
+            model: multilingual-e5-large
+            read_parameters:
+              input_type: query
+              truncate: NONE
+            write_parameters:
+              input_type: passage
+          description: |-
+            Specify the integrated inference embedding configuration for the index.
+
+            Once set the model cannot be changed, but you can later update the embedding configuration for an integrated inference index including field map, read parameters, or write parameters.
+
+            Refer to the [model guide](https://docs.pinecone.io/guides/index-data/create-an-index#embedding-models) for available models and model details.
+          type: object
+          properties:
+            model:
+              example: multilingual-e5-large
+              description: The name of the embedding model to use for the index.
+              type: string
+            metric:
+              description: |-
+                The distance metric to be used for similarity search. You can use 'euclidean', 'cosine', or 'dotproduct'. If not specified, the metric will be defaulted according to the model. Cannot be updated once set.
+                Possible values: `cosine`, `euclidean`, or `dotproduct`.
+              x-enum:
+              - cosine
+              - euclidean
+              - dotproduct
+              type: string
+            field_map:
+              example:
+                text: your-text-field
+              description: Identifies the name of the text field from your document model that will be embedded.
+              type: object
+            dimension:
+              description: The dimension of embedding vectors produced for the index.
+              type: integer
+            read_parameters:
+              description: The read parameters for the embedding model.
+              type: object
+            write_parameters:
+              description: The write parameters for the embedding model.
+              type: object
+          required:
+          - model
+          - field_map
+      required:
+      - name
+      - cloud
+      - region
+      - embed
+    CreateIndexFromBackupRequest:
+      description: The configuration needed to create a Pinecone index from a backup.
+      type: object
+      properties:
+        name:
+          example: example-index
+          description: |
+            The name of the index. Resource name must be 1-45 characters long, start and end with an alphanumeric character, and consist only of lower case alphanumeric characters or '-'.
+          type: string
+          minLength: 1
+          maxLength: 45
+        tags:
+          $ref: '#/components/schemas/IndexTags'
+        deletion_protection:
+          $ref: '#/components/schemas/DeletionProtection'
+        read_capacity:
+          $ref: '#/components/schemas/ReadCapacity'
+      required:
+      - name
+    CreateIndexFromBackupResponse:
+      description: The response for creating an index from a backup.
+      type: object
+      properties:
+        restore_job_id:
+          example: 670e8400-e29b-41d4-a716-446655440000
+          description: The ID of the restore job that was created.
+          type: string
+        index_id:
+          example: 123e4567-e89b-12d3-a456-426614174000
+          description: The ID of the index that was created from the backup.
+          type: string
+      required:
+      - restore_job_id
+      - index_id
+    CreateIndexRequest:
+      description: The configuration needed to create a Pinecone index.
+      type: object
+      properties:
+        name:
+          example: example-index
+          description: |
+            The name of the index. Resource name must be 1-45 characters long, start and end with an alphanumeric character, and consist only of lower case alphanumeric characters or '-'.
+          type: string
+          minLength: 1
+          maxLength: 45
+        dimension:
+          example: 1536
+          description: The dimensions of the vectors to be inserted in the index.
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 20000
+        metric:
+          description: |-
+            The distance metric to be used for similarity search. You can use 'euclidean', 'cosine', or 'dotproduct'. If the 'vector_type' is 'sparse', the metric must be 'dotproduct'. If the `vector_type` is `dense`, the metric defaults to 'cosine'.
+            Possible values: `cosine`, `euclidean`, or `dotproduct`.
+          x-enum:
+          - cosine
+          - euclidean
+          - dotproduct
+          type: string
+        deletion_protection:
+          $ref: '#/components/schemas/DeletionProtection'
+        tags:
+          $ref: '#/components/schemas/IndexTags'
+        spec:
+          $ref: '#/components/schemas/IndexSpec'
+        vector_type:
+          description: The index vector type. You can use 'dense' or 'sparse'. If 'dense', the vector dimension must be specified.  If 'sparse', the vector dimension should not be specified.
+          default: dense
+          type: string
+      required:
+      - name
+      - spec
+    DeletionProtection:
+      description: |-
+        Whether [deletion protection](http://docs.pinecone.io/guides/manage-data/manage-indexes#configure-deletion-protection) is enabled/disabled for the index.
+        Possible values: `disabled` or `enabled`.
+      default: disabled
+      x-enum:
+      - disabled
+      - enabled
+      type: string
     ErrorResponse:
       example:
         error:
@@ -2399,77 +3821,15 @@ components:
       required:
       - status
       - error
-    RestoreJobModel:
-      description: The RestoreJobModel describes the status of a restore job.
+    IndexList:
+      description: The list of indexes that exist in the project.
       type: object
       properties:
-        restore_job_id:
-          example: 670e8400-e29b-41d4-a716-446655440001
-          description: Unique identifier for the restore job
-          type: string
-        backup_id:
-          example: 670e8400-e29b-41d4-a716-446655440000
-          description: Backup used for the restore
-          type: string
-        target_index_name:
-          example: sample-index
-          description: Name of the index into which data is being restored
-          type: string
-        target_index_id:
-          example: 670e8400-e29b-41d4-a716-446655440002
-          description: ID of the index
-          type: string
-        status:
-          example: Completed
-          description: Status of the restore job
-          type: string
-        created_at:
-          example: 2025-02-04T13:00:00Z
-          description: Timestamp when the restore job started
-          type: string
-          format: date-time
-        completed_at:
-          example: 2025-02-04T14:00:00Z
-          description: Timestamp when the restore job finished
-          type: string
-          format: date-time
-        percent_complete:
-          example: 42.2
-          description: The progress made by the restore job out of 100
-          type: number
-          format: float
-          minimum: 0.0
-          maximum: 100.0
-      required:
-      - restore_job_id
-      - backup_id
-      - target_index_name
-      - target_index_id
-      - status
-      - created_at
-    ReadCapacityResponse:
-      description: Response containing read capacity configuration
-      discriminator:
-        propertyName: mode
-        mapping:
-          OnDemand: '#/components/schemas/ReadCapacityOnDemandSpecResponse'
-          Dedicated: '#/components/schemas/ReadCapacityDedicatedSpecResponse'
-      oneOf:
-      - $ref: '#/components/schemas/ReadCapacityOnDemandSpecResponse'
-      - $ref: '#/components/schemas/ReadCapacityDedicatedSpecResponse'
-    RestoreJobList:
-      description: The list of restore jobs that exist in the project.
-      type: object
-      properties:
-        data:
-          description: List of restore job objects
+        indexes:
+          description: List of indexes in the project
           type: array
           items:
-            $ref: '#/components/schemas/RestoreJobModel'
-        pagination:
-          $ref: '#/components/schemas/PaginationResponse'
-      required:
-      - data
+            $ref: '#/components/schemas/IndexModel'
     IndexModel:
       description: The IndexModel describes the configuration and status of a Pinecone index.
       type: object
@@ -2590,134 +3950,95 @@ components:
       - spec
       - host
       - vector_type
-    CreateIndexForModelRequest:
-      description: The desired configuration for the index and associated embedding model.
+    IndexSpec:
+      description: |
+        The spec object defines how the index should be deployed.
+
+        For serverless indexes, you define only the [cloud and region](http://docs.pinecone.io/guides/index-data/create-an-index#cloud-regions) where the index should be hosted. For pod-based indexes, you define the [environment](http://docs.pinecone.io/guides/indexes/pods/understanding-pod-based-indexes#pod-environments) where the index should be hosted, the [pod type and size](http://docs.pinecone.io/guides/indexes/pods/understanding-pod-based-indexes#pod-types) to use, and other index characteristics.
+      type: object
+      oneOf:
+      - title: Serverless
+        type: object
+        properties:
+          serverless:
+            $ref: '#/components/schemas/ServerlessSpec'
+        required:
+        - serverless
+        additionalProperties: false
+      - title: Pod-based
+        type: object
+        properties:
+          pod:
+            $ref: '#/components/schemas/PodSpec'
+        required:
+        - pod
+        additionalProperties: false
+      - title: BYOC
+        type: object
+        properties:
+          byoc:
+            $ref: '#/components/schemas/ByocSpec'
+        required:
+        - byoc
+        additionalProperties: false
+    IndexTags:
+      example:
+        tag0: val0
+        tag1: val1
+      description: Custom user tags added to an index. Keys must be 80 characters or less. Values must be 120 characters or less. Keys must be alphanumeric, '_', or '-'.  Values must be alphanumeric, ';', '@', '_', '-', '.', '+', or ' '. To unset a key, set the value to be an empty string.
+      type: object
+      additionalProperties:
+        type: string
+    MetadataSchema:
+      example:
+        fields:
+          description:
+            filterable: true
+          genre:
+            filterable: true
+          year:
+            filterable: true
+      description: 'Schema for the behavior of Pinecone''s internal metadata index. By default, all metadata is indexed; when `schema` is present, only fields which are present in the `fields` object with a `filterable: true` are indexed. Note that `filterable: false` is not currently supported.'
       type: object
       properties:
-        name:
-          example: example-index
-          description: |
-            The name of the index. Resource name must be 1-45 characters long, start and end with an alphanumeric character, and consist only of lower case alphanumeric characters or '-'.
-          type: string
-          minLength: 1
-          maxLength: 45
-        cloud:
-          example: aws
-          description: |-
-            The public cloud where you would like your index hosted.
-            Possible values: `gcp`, `aws`, or `azure`.
-          x-enum:
-          - gcp
-          - aws
-          - azure
-          type: string
-        region:
-          example: us-east-1
-          description: The region where you would like your index to be created.
-          type: string
-        deletion_protection:
-          $ref: '#/components/schemas/DeletionProtection'
-        tags:
-          $ref: '#/components/schemas/IndexTags'
-        schema:
-          $ref: '#/components/schemas/MetadataSchema'
-        read_capacity:
-          $ref: '#/components/schemas/ReadCapacity'
-        embed:
-          example:
-            field_map:
-              text: your-text-field
-            metric: cosine
-            model: multilingual-e5-large
-            read_parameters:
-              input_type: query
-              truncate: NONE
-            write_parameters:
-              input_type: passage
-          description: |-
-            Specify the integrated inference embedding configuration for the index.
-
-            Once set the model cannot be changed, but you can later update the embedding configuration for an integrated inference index including field map, read parameters, or write parameters.
-
-            Refer to the [model guide](https://docs.pinecone.io/guides/index-data/create-an-index#embedding-models) for available models and model details.
+        fields:
+          description: A map of metadata field names to their configuration. The field name must be a valid metadata field name. The field name must be unique.
           type: object
-          properties:
-            model:
-              example: multilingual-e5-large
-              description: The name of the embedding model to use for the index.
-              type: string
-            metric:
-              description: |-
-                The distance metric to be used for similarity search. You can use 'euclidean', 'cosine', or 'dotproduct'. If not specified, the metric will be defaulted according to the model. Cannot be updated once set.
-                Possible values: `cosine`, `euclidean`, or `dotproduct`.
-              x-enum:
-              - cosine
-              - euclidean
-              - dotproduct
-              type: string
-            field_map:
-              example:
-                text: your-text-field
-              description: Identifies the name of the text field from your document model that will be embedded.
-              type: object
-            dimension:
-              description: The dimension of embedding vectors produced for the index.
-              type: integer
-            read_parameters:
-              description: The read parameters for the embedding model.
-              type: object
-            write_parameters:
-              description: The write parameters for the embedding model.
-              type: object
-          required:
-          - model
-          - field_map
+          additionalProperties:
+            type: object
+            properties:
+              filterable:
+                description: Whether the field is filterable. If true, the field is indexed and can be used in filters. Only true values are allowed.
+                type: boolean
       required:
-      - name
-      - cloud
-      - region
-      - embed
-    ServerlessSpec:
-      title: Serverless
-      description: Configuration needed to deploy a serverless index.
+      - fields
+    ModelIndexEmbed:
+      example:
+        field_map:
+          text: your-text-field
+        metric: cosine
+        model: multilingual-e5-large
+        read_parameters:
+          input_type: query
+          truncate: NONE
+        write_parameters:
+          input_type: passage
+      description: The embedding model and document fields mapped to embedding inputs.
       type: object
       properties:
-        cloud:
-          example: aws
+        model:
+          example: multilingual-e5-large
+          description: The name of the embedding model used to create the index.
+          type: string
+        metric:
           description: |-
-            The public cloud where you would like your index hosted.
-            Possible values: `gcp`, `aws`, or `azure`.
+            The distance metric to be used for similarity search. You can use 'euclidean', 'cosine', or 'dotproduct'. If not specified, the metric will be defaulted according to the model. Cannot be updated once set.
+            Possible values: `cosine`, `euclidean`, or `dotproduct`.
           x-enum:
-          - gcp
-          - aws
-          - azure
+          - cosine
+          - euclidean
+          - dotproduct
           type: string
-        region:
-          example: us-east-1
-          description: The region where you would like your index to be created.
-          type: string
-        read_capacity:
-          $ref: '#/components/schemas/ReadCapacity'
-        source_collection:
-          example: movie-embeddings
-          description: The name of the collection to be used as the source for the index.
-          type: string
-        schema:
-          $ref: '#/components/schemas/MetadataSchema'
-      required:
-      - cloud
-      - region
-    CreateIndexRequest:
-      description: The configuration needed to create a Pinecone index.
-      type: object
-      properties:
-        name:
-          example: example-index
-          description: |
-            The name of the index. Resource name must be 1-45 characters long, start and end with an alphanumeric character, and consist only of lower case alphanumeric characters or '-'.
-          type: string
-          minLength: 1
-          maxLength: 45
         dimension:
           example: 1536
           description: The dimensions of the vectors to be inserted in the index.
@@ -2725,147 +4046,23 @@ components:
           format: int32
           minimum: 1
           maximum: 20000
-        metric:
-          description: |-
-            The distance metric to be used for similarity search. You can use 'euclidean', 'cosine', or 'dotproduct'. If the 'vector_type' is 'sparse', the metric must be 'dotproduct'. If the `vector_type` is `dense`, the metric defaults to 'cosine'.
-            Possible values: `cosine`, `euclidean`, or `dotproduct`.
-          x-enum:
-          - cosine
-          - euclidean
-          - dotproduct
-          type: string
-        deletion_protection:
-          $ref: '#/components/schemas/DeletionProtection'
-        tags:
-          $ref: '#/components/schemas/IndexTags'
-        spec:
-          $ref: '#/components/schemas/IndexSpec'
         vector_type:
           description: The index vector type. You can use 'dense' or 'sparse'. If 'dense', the vector dimension must be specified.  If 'sparse', the vector dimension should not be specified.
           default: dense
           type: string
+        field_map:
+          example:
+            text: your-text-field
+          description: Identifies the name of the text field from your document model that is embedded.
+          type: object
+        read_parameters:
+          description: The read parameters for the embedding model.
+          type: object
+        write_parameters:
+          description: The write parameters for the embedding model.
+          type: object
       required:
-      - name
-      - spec
-    CreateBackupRequest:
-      description: The configuration needed to create a backup of an index.
-      type: object
-      properties:
-        name:
-          description: The name of the backup.
-          type: string
-        description:
-          description: A description of the backup.
-          type: string
-    ReadCapacityDedicatedSpecResponse:
-      example:
-        dedicated:
-          manual:
-            replicas: 2
-            shards: 2
-          node_type: t1
-          scaling: Manual
-        mode: Dedicated
-        status:
-          current_replicas: 2
-          current_shards: 2
-          state: Ready
-      title: Dedicated
-      type: object
-      properties:
-        mode:
-          description: 'The mode of the index. Possible values: `OnDemand` or `Dedicated`. Defaults to `OnDemand`. If set to `Dedicated`, `dedicated.node_type`, and `dedicated.scaling` must be specified.'
-          type: string
-        dedicated:
-          $ref: '#/components/schemas/ReadCapacityDedicatedConfig'
-        status:
-          $ref: '#/components/schemas/ReadCapacityStatus'
-      required:
-      - mode
-      - dedicated
-      - status
-      additionalProperties: false
-    ReadCapacityDedicatedConfig:
-      description: Configuration for dedicated read capacity. See  [this guide](https://docs.pinecone.io/guides/index-data/dedicated-read-nodes) for more details on  how to configure dedicated read capacity.
-      type: object
-      properties:
-        node_type:
-          description: 'The type of machines to use. Available options: `b1` and `t1`. `t1` includes increased processing power and memory.'
-          type: string
-        scaling:
-          description: The type of scaling strategy to use.
-          type: string
-        manual:
-          $ref: '#/components/schemas/ScalingConfigManual'
-    ReadCapacityDedicatedSpec:
-      example:
-        dedicated:
-          manual:
-            replicas: 1
-            shards: 1
-          node_type: t1
-          scaling: Manual
-        mode: Dedicated
-      title: Dedicated
-      type: object
-      properties:
-        mode:
-          description: 'The mode of the index. Possible values: `OnDemand` or `Dedicated`. Defaults to `OnDemand`. If set to `Dedicated`, `dedicated.node_type`, and `dedicated.scaling` must be specified.'
-          type: string
-        dedicated:
-          $ref: '#/components/schemas/ReadCapacityDedicatedConfig'
-      required:
-      - mode
-      - dedicated
-      additionalProperties: true
-    CreateCollectionRequest:
-      description: The configuration needed to create a Pinecone collection.
-      type: object
-      properties:
-        name:
-          description: |
-            The name of the collection to be created. Resource name must be 1-45 characters long, start and end with an alphanumeric character, and consist only of lower case alphanumeric characters or '-'.
-          type: string
-          minLength: 1
-          maxLength: 45
-        source:
-          example: example-source-index
-          description: The name of the index to be used as the source for the collection.
-          type: string
-      required:
-      - name
-      - source
-    ScalingConfigManual:
-      description: The config to use for manual read capacity scaling.
-      type: object
-      properties:
-        replicas:
-          description: The number of replicas to use. Replicas duplicate the compute resources and data of an index, allowing higher query throughput and availability. Setting replicas to 0 disables the index but can be used to reduce costs while usage is paused.
-          type: integer
-          format: int32
-          minimum: 0
-        shards:
-          description: The number of shards to use. Shards determine the storage capacity of an index, with each shard providing 250 GB of storage.
-          type: integer
-          format: int32
-          minimum: 1
-    ByocSpec:
-      example:
-        environment: aws-us-east-1-b921
-      title: BYOC
-      description: Configuration needed to deploy an index in a BYOC environment.
-      type: object
-      properties:
-        environment:
-          example: aws-us-east-1-b921
-          description: The environment where the index is hosted.
-          type: string
-        read_capacity:
-          $ref: '#/components/schemas/ReadCapacity'
-        schema:
-          $ref: '#/components/schemas/MetadataSchema'
-      required:
-      - environment
+      - model
     PodSpec:
       example:
         environment: us-east1-gcp
@@ -2930,6 +4127,116 @@ components:
       required:
       - environment
       - pod_type
+    ReadCapacity:
+      description: By default the index will be created with read capacity  mode `OnDemand`. If you prefer to allocate dedicated read  nodes for your workload, you must specify mode `Dedicated` and additional configurations for `node_type` and `scaling`.
+      discriminator:
+        propertyName: mode
+        mapping:
+          OnDemand: '#/components/schemas/ReadCapacityOnDemandSpec'
+          Dedicated: '#/components/schemas/ReadCapacityDedicatedSpec'
+      oneOf:
+      - $ref: '#/components/schemas/ReadCapacityOnDemandSpec'
+      - $ref: '#/components/schemas/ReadCapacityDedicatedSpec'
+    ReadCapacityDedicatedConfig:
+      description: Configuration for dedicated read capacity. See  [this guide](https://docs.pinecone.io/guides/index-data/dedicated-read-nodes) for more details on  how to configure dedicated read capacity.
+      type: object
+      properties:
+        node_type:
+          description: 'The type of machines to use. Available options: `b1` and `t1`. `t1` includes increased processing power and memory.'
+          type: string
+        scaling:
+          description: The type of scaling strategy to use.
+          type: string
+        manual:
+          $ref: '#/components/schemas/ScalingConfigManual'
+    ReadCapacityDedicatedSpec:
+      example:
+        dedicated:
+          manual:
+            replicas: 1
+            shards: 1
+          node_type: t1
+          scaling: Manual
+        mode: Dedicated
+      title: Dedicated
+      type: object
+      properties:
+        mode:
+          description: 'The mode of the index. Possible values: `OnDemand` or `Dedicated`. Defaults to `OnDemand`. If set to `Dedicated`, `dedicated.node_type`, and `dedicated.scaling` must be specified.'
+          type: string
+        dedicated:
+          $ref: '#/components/schemas/ReadCapacityDedicatedConfig'
+      required:
+      - mode
+      - dedicated
+      additionalProperties: true
+    ReadCapacityDedicatedSpecResponse:
+      example:
+        dedicated:
+          manual:
+            replicas: 2
+            shards: 2
+          node_type: t1
+          scaling: Manual
+        mode: Dedicated
+        status:
+          current_replicas: 2
+          current_shards: 2
+          state: Ready
+      title: Dedicated
+      type: object
+      properties:
+        mode:
+          description: 'The mode of the index. Possible values: `OnDemand` or `Dedicated`. Defaults to `OnDemand`. If set to `Dedicated`, `dedicated.node_type`, and `dedicated.scaling` must be specified.'
+          type: string
+        dedicated:
+          $ref: '#/components/schemas/ReadCapacityDedicatedConfig'
+        status:
+          $ref: '#/components/schemas/ReadCapacityStatus'
+      required:
+      - mode
+      - dedicated
+      - status
+      additionalProperties: false
+    ReadCapacityOnDemandSpec:
+      example:
+        mode: OnDemand
+      title: On-demand
+      type: object
+      properties:
+        mode:
+          description: 'The mode of the index. Possible values: `OnDemand` or `Dedicated`. Defaults to `OnDemand`. If set to `Dedicated`, `dedicated.node_type`, and `dedicated.scaling` must be specified.'
+          type: string
+      required:
+      - mode
+      additionalProperties: false
+    ReadCapacityOnDemandSpecResponse:
+      example:
+        mode: OnDemand
+        status:
+          state: Ready
+      title: On-demand
+      type: object
+      properties:
+        mode:
+          description: 'The mode of the index. Possible values: `OnDemand` or `Dedicated`. Defaults to `OnDemand`. If set to `Dedicated`, `dedicated.node_type`, and `dedicated.scaling` must be specified.'
+          type: string
+        status:
+          $ref: '#/components/schemas/ReadCapacityStatus'
+      required:
+      - mode
+      - status
+      additionalProperties: false
+    ReadCapacityResponse:
+      description: Response containing read capacity configuration
+      discriminator:
+        propertyName: mode
+        mapping:
+          OnDemand: '#/components/schemas/ReadCapacityOnDemandSpecResponse'
+          Dedicated: '#/components/schemas/ReadCapacityDedicatedSpecResponse'
+      oneOf:
+      - $ref: '#/components/schemas/ReadCapacityOnDemandSpecResponse'
+      - $ref: '#/components/schemas/ReadCapacityDedicatedSpecResponse'
     ReadCapacityStatus:
       description: The current status of factors affecting the read capacity of a serverless index
       type: object
@@ -2950,6 +4257,130 @@ components:
           type: string
       required:
       - state
+    RestoreJobList:
+      description: The list of restore jobs that exist in the project.
+      type: object
+      properties:
+        data:
+          description: List of restore job objects
+          type: array
+          items:
+            $ref: '#/components/schemas/RestoreJobModel'
+        pagination:
+          nullable: true
+          description: Cursor envelope for the next page. `null` (or absent) on the final page of results.
+          type: object
+          allOf:
+          - example:
+              next: dXNlcl9pZD11c2VyXzE=
+            description: The pagination object that is returned with paginated responses.
+            x-component-name: PaginationResponse
+            type: object
+            properties:
+              next:
+                example: dXNlcl9pZD11c2VyXzE=
+                description: The token to use to retrieve the next page of results.
+                type: string
+            required:
+            - next
+      required:
+      - data
+    RestoreJobModel:
+      description: The RestoreJobModel describes the status of a restore job.
+      type: object
+      properties:
+        restore_job_id:
+          example: 670e8400-e29b-41d4-a716-446655440001
+          description: Unique identifier for the restore job
+          type: string
+        backup_id:
+          example: 670e8400-e29b-41d4-a716-446655440000
+          description: Backup used for the restore
+          type: string
+        target_index_name:
+          example: sample-index
+          description: Name of the index into which data is being restored
+          type: string
+        target_index_id:
+          example: 670e8400-e29b-41d4-a716-446655440002
+          description: ID of the index
+          type: string
+        status:
+          example: Completed
+          description: Status of the restore job
+          type: string
+        created_at:
+          example: 2025-02-04T13:00:00Z
+          description: Timestamp when the restore job started
+          type: string
+          format: date-time
+        completed_at:
+          example: 2025-02-04T14:00:00Z
+          description: Timestamp when the restore job finished
+          type: string
+          format: date-time
+        percent_complete:
+          example: 42.2
+          description: The progress made by the restore job out of 100
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 100.0
+      required:
+      - restore_job_id
+      - backup_id
+      - target_index_name
+      - target_index_id
+      - status
+      - created_at
+    ScalingConfigManual:
+      description: The config to use for manual read capacity scaling.
+      type: object
+      properties:
+        replicas:
+          description: The number of replicas to use. Replicas duplicate the compute resources and data of an index, allowing higher query throughput and availability. Setting replicas to 0 disables the index but can be used to reduce costs while usage is paused.
+          type: integer
+          format: int32
+          minimum: 0
+        shards:
+          description: The number of shards to use. Shards determine the storage capacity of an index, with each shard providing 250 GB of storage.
+          type: integer
+          format: int32
+          minimum: 1
+    ServerlessSpec:
+      title: Serverless
+      description: Configuration needed to deploy a serverless index.
+      type: object
+      properties:
+        cloud:
+          example: aws
+          description: |-
+            The public cloud where you would like your index hosted.
+            Possible values: `gcp`, `aws`, or `azure`.
+          x-enum:
+          - gcp
+          - aws
+          - azure
+          type: string
+        region:
+          example: us-east-1
+          description: The region where you would like your index to be created.
+          type: string
+        read_capacity:
+          $ref: '#/components/schemas/ReadCapacity'
+        source_collection:
+          example: movie-embeddings
+          description: The name of the collection to be used as the source for the index.
+          type: string
+        source_backup_id:
+          example: 670e8400-e29b-41d4-a716-446655440000
+          description: The ID of a backup from which to restore the index. Mutually exclusive with `source_collection`. The target `cloud` and `region` may differ from the backup's source region for same-cloud cross-region restore. Cross-cloud restore is not supported.
+          type: string
+        schema:
+          $ref: '#/components/schemas/MetadataSchema'
+      required:
+      - cloud
+      - region
     ServerlessSpecResponse:
       description: Configuration of a serverless index.
       type: object
@@ -2974,268 +4405,35 @@ components:
           example: movie-embeddings
           description: The name of the collection to be used as the source for the index.
           type: string
+        source_backup_id:
+          example: 670e8400-e29b-41d4-a716-446655440000
+          description: The ID of the backup this index was restored from, if any.
+          type: string
         schema:
           $ref: '#/components/schemas/MetadataSchema'
       required:
       - cloud
       - region
       - read_capacity
-    BackupList:
-      description: The list of backups that exist in the project.
+    UpdateBackupScheduleRequest:
+      description: 'Fields that can be updated on an existing backup schedule. Omitted fields are left unchanged. Re-enabling a disabled schedule (`enabled: true`) enqueues a new backup operation.'
       type: object
       properties:
-        data:
-          description: List of backup objects
-          type: array
-          items:
-            $ref: '#/components/schemas/BackupModel'
-        pagination:
-          $ref: '#/components/schemas/PaginationResponse'
-    DeletionProtection:
-      description: |-
-        Whether [deletion protection](http://docs.pinecone.io/guides/manage-data/manage-indexes#configure-deletion-protection) is enabled/disabled for the index.
-        Possible values: `disabled` or `enabled`.
-      default: disabled
-      x-enum:
-      - disabled
-      - enabled
-      type: string
-    ModelIndexEmbed:
-      example:
-        field_map:
-          text: your-text-field
-        metric: cosine
-        model: multilingual-e5-large
-        read_parameters:
-          input_type: query
-          truncate: NONE
-        write_parameters:
-          input_type: passage
-      description: The embedding model and document fields mapped to embedding inputs.
-      type: object
-      properties:
-        model:
-          example: multilingual-e5-large
-          description: The name of the embedding model used to create the index.
-          type: string
-        metric:
-          description: |-
-            The distance metric to be used for similarity search. You can use 'euclidean', 'cosine', or 'dotproduct'. If not specified, the metric will be defaulted according to the model. Cannot be updated once set.
-            Possible values: `cosine`, `euclidean`, or `dotproduct`.
+        frequency:
+          example: weekly
+          description: How often the scheduled backup runs.
           x-enum:
-          - cosine
-          - euclidean
-          - dotproduct
+          - daily
+          - weekly
+          - monthly
           type: string
-        dimension:
-          example: 1536
-          description: The dimensions of the vectors to be inserted in the index.
-          type: integer
-          format: int32
-          minimum: 1
-          maximum: 20000
-        vector_type:
-          description: The index vector type. You can use 'dense' or 'sparse'. If 'dense', the vector dimension must be specified.  If 'sparse', the vector dimension should not be specified.
-          default: dense
-          type: string
-        field_map:
-          example:
-            text: your-text-field
-          description: Identifies the name of the text field from your document model that is embedded.
-          type: object
-        read_parameters:
-          description: The read parameters for the embedding model.
-          type: object
-        write_parameters:
-          description: The write parameters for the embedding model.
-          type: object
-      required:
-      - model
-    CreateIndexFromBackupResponse:
-      description: The response for creating an index from a backup.
-      type: object
-      properties:
-        restore_job_id:
-          example: 670e8400-e29b-41d4-a716-446655440000
-          description: The ID of the restore job that was created.
-          type: string
-        index_id:
-          example: 123e4567-e89b-12d3-a456-426614174000
-          description: The ID of the index that was created from the backup.
-          type: string
-      required:
-      - restore_job_id
-      - index_id
-    CollectionModel:
-      description: The CollectionModel describes the configuration and status of a Pinecone collection.
-      type: object
-      properties:
-        name:
-          example: example-collection
-          description: The name of the collection.
-          type: string
-        size:
-          example: 10000000
-          description: The size of the collection in bytes.
-          type: integer
-          format: int64
-        status:
-          example: Initializing
-          description: |-
-            The status of the collection.
-            Possible values: `Initializing`, `Ready`, or `Terminating`.
-          x-enum:
-          - Initializing
-          - Ready
-          - Terminating
-          type: string
-        dimension:
-          example: 1536
-          description: The dimension of the vectors stored in each record held in the collection.
-          type: integer
-          format: int32
-          minimum: 1
-          maximum: 20000
-        vector_count:
-          example: 120000
-          description: The number of records stored in the collection.
-          type: integer
-          format: int32
-        environment:
-          example: us-east1-gcp
-          description: The environment where the collection is hosted.
-          type: string
-      required:
-      - name
-      - status
-      - environment
-    IndexList:
-      description: The list of indexes that exist in the project.
-      type: object
-      properties:
-        indexes:
-          description: List of indexes in the project
-          type: array
-          items:
-            $ref: '#/components/schemas/IndexModel'
-    BackupModel:
-      description: The BackupModel describes the configuration and status of a Pinecone backup.
-      type: object
-      properties:
-        backup_id:
-          example: 670e8400-e29b-41d4-a716-446655440001
-          description: Unique identifier for the backup.
-          type: string
-        source_index_name:
-          example: my-index
-          description: Name of the index from which the backup was taken.
-          type: string
-        source_index_id:
-          example: 670e8400-e29b-41d4-a716-446655440000
-          description: ID of the index.
-          type: string
-        name:
-          example: backup-2025-02-04
-          description: Optional user-defined name for the backup.
-          type: string
-        description:
-          example: Backup before bulk update.
-          description: Optional description providing context for the backup.
-          type: string
-        status:
-          example: Ready
-          description: Current status of the backup (e.g., Initializing, Ready, Failed).
-          type: string
-        cloud:
-          example: aws
-          description: Cloud provider where the backup is stored.
-          type: string
-        region:
-          example: us-east-1
-          description: Cloud region where the backup is stored.
-          type: string
-        dimension:
-          example: 1536
-          description: The dimensions of the vectors to be inserted in the index.
-          type: integer
-          format: int32
-          minimum: 1
-          maximum: 20000
-        metric:
-          description: |-
-            The distance metric to be used for similarity search. You can use 'euclidean', 'cosine', or 'dotproduct'. If the 'vector_type' is 'sparse', the metric must be 'dotproduct'. If the `vector_type` is `dense`, the metric defaults to 'cosine'.
-            Possible values: `cosine`, `euclidean`, or `dotproduct`.
-          x-enum:
-          - cosine
-          - euclidean
-          - dotproduct
-          type: string
-        schema:
-          $ref: '#/components/schemas/MetadataSchema'
-        record_count:
-          example: 120000
-          description: Total number of records in the backup.
-          type: integer
-        namespace_count:
-          example: 3
-          description: Number of namespaces in the backup.
-          type: integer
-        size_bytes:
-          example: 10000000
-          description: Size of the backup in bytes.
-          type: integer
-        tags:
-          $ref: '#/components/schemas/IndexTags'
-        created_at:
-          description: Timestamp when the backup was created.
-          type: string
-      required:
-      - backup_id
-      - source_index_name
-      - source_index_id
-      - status
-      - cloud
-      - region
-    ReadCapacityOnDemandSpec:
-      example:
-        mode: OnDemand
-      title: On-demand
-      type: object
-      properties:
-        mode:
-          description: 'The mode of the index. Possible values: `OnDemand` or `Dedicated`. Defaults to `OnDemand`. If set to `Dedicated`, `dedicated.node_type`, and `dedicated.scaling` must be specified.'
-          type: string
-      required:
-      - mode
+        retention:
+          $ref: '#/components/schemas/BackupScheduleRetentionInput'
+        enabled:
+          example: false
+          description: Whether the schedule is active. Setting to `true` after a disable re-enqueues backup processing.
+          type: boolean
       additionalProperties: false
-    ByocSpecResponse:
-      title: BYOC
-      description: Configuration of a BYOC index.
-      type: object
-      properties:
-        environment:
-          example: aws-us-east-1-b921
-          description: The environment where the index is hosted.
-          type: string
-        read_capacity:
-          $ref: '#/components/schemas/ReadCapacityResponse'
-        schema:
-          $ref: '#/components/schemas/MetadataSchema'
-      required:
-      - environment
-      - read_capacity
-    PaginationResponse:
-      example:
-        next: dXNlcl9pZD11c2VyXzE=
-      description: The pagination object that is returned with paginated responses.
-      type: object
-      properties:
-        next:
-          example: dXNlcl9pZD11c2VyXzE=
-          description: The token to use to retrieve the next page of results.
-          type: string
-      required:
-      - next
   securitySchemes:
     ApiKeyAuth:
       type: apiKey

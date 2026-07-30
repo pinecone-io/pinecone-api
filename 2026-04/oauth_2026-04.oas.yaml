@@ -94,31 +94,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 components:
   schemas:
-    TokenResponse:
-      example:
-        access_token: eyJz93a...k4laUWw
-        expires_in: 1800
-        token_type: Bearer
-      description: A response that contains the access token.
-      type: object
-      properties:
-        access_token:
-          description: The access token.
-          type: string
-        token_type:
-          description: |-
-            The type of token.
-            Possible values: `Bearer`.
-          x-enum:
-          - Bearer
-          type: string
-        expires_in:
-          description: The number of seconds until the token expires.
-          type: integer
-      required:
-      - access_token
-      - token_type
-      - expires_in
     ErrorResponse:
       example:
         error: access_denied
@@ -166,6 +141,31 @@ components:
       - client_secret
       - grant_type
       - audience
+    TokenResponse:
+      example:
+        access_token: eyJz93a...k4laUWw
+        expires_in: 1800
+        token_type: Bearer
+      description: A response that contains the access token.
+      type: object
+      properties:
+        access_token:
+          description: The access token.
+          type: string
+        token_type:
+          description: |-
+            The type of token.
+            Possible values: `Bearer`.
+          x-enum:
+          - Bearer
+          type: string
+        expires_in:
+          description: The number of seconds until the token expires.
+          type: integer
+      required:
+      - access_token
+      - token_type
+      - expires_in
 tags:
 - name: OAuth
   description: Authentication using the OAuth2 protocol.

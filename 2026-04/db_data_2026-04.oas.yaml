@@ -1356,6 +1356,11 @@ components:
               type: array
               items:
                 type: string
+        size_bytes:
+          example: 1048576
+          description: The total size of the namespace's data, in bytes.
+          type: integer
+          format: int64
     ListNamespacesResponse:
       type: object
       properties:

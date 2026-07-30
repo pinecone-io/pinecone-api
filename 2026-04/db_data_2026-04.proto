@@ -376,6 +376,8 @@ message NamespaceDescription {
   optional MetadataSchema schema = 3;
   // List of indexed fields in the namespace
   optional IndexedFields indexed_fields = 4;
+  // The total size of the namespace's data, in bytes.
+  uint64 size_bytes = 5;
 }
 
 message DeleteNamespaceRequest {

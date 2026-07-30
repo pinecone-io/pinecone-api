@@ -605,7 +605,7 @@ paths:
         style: form
       responses:
         '200':
-          description: A list of operations.
+          description: Successful response.
           content:
             application/json:
               schema:
@@ -1557,6 +1557,7 @@ components:
             - analytics
           description: Optional metadata associated with the file. This metadata can be used to filter files when listing them or to restrict search results when querying the assistant. Maximum size is 16KB.
           type: object
+          additionalProperties: true
       required:
       - file
     HighlightModel:
@@ -1787,7 +1788,7 @@ components:
         pagination:
           $ref: '#/components/schemas/PaginationResponse'
     OperationModel:
-      description: The OperationModel describes the status of an ongoing or completed server operation.
+      description: Describes the status of an ongoing or completed server operation.
       type: object
       properties:
         id:

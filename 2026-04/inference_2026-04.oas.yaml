@@ -439,122 +439,26 @@ paths:
                     status: 500
 components:
   schemas:
-    ModelInfoMetric:
-      description: |-
-        A distance metric that the embedding model supports for similarity searches.
-        Possible values: `cosine`, `euclidean`, or `dotproduct`.
-      x-enum:
-      - cosine
-      - euclidean
-      - dotproduct
-      type: string
-    ModelInfoSupportedParameter:
-      description: Describes a parameter supported by the model, including parameter value constraints.
+    DenseEmbedding:
+      title: Dense embedding
+      description: A dense embedding of a single input
       type: object
       properties:
-        parameter:
-          example: input_type
-          description: The name of the parameter.
-          type: string
-        type:
-          example: one_of
-          description: |-
-            The parameter type e.g. 'one_of', 'numeric_range', or 'any'.
-
-            If the type is 'one_of', then 'allowed_values' will be set, and the value specified must be one of the allowed values. 'one_of' is only compatible with value_type 'string' or 'integer'.
-
-            If 'numeric_range', then 'min' and 'max' will be set, then the value specified must adhere to the value_type and must fall within the `[min, max]` range (inclusive).
-
-            If 'any' then any value is allowed, as long as it adheres to the value_type.
-          type: string
-        value_type:
-          example: string
-          description: The type of value the parameter accepts, e.g. 'string', 'integer', 'float', or 'boolean'.
-          type: string
-        required:
-          example: true
-          description: Whether the parameter is required (true) or optional (false).
-          type: boolean
-        allowed_values:
-          description: The allowed parameter values when the type is 'one_of'.
-          type: array
-          items:
-            anyOf:
-            - type: string
-            - type: integer
-        min:
-          example: 1
-          description: The minimum allowed value (inclusive) when the type is 'numeric_range'.
-          type: number
-        max:
-          example: 1
-          description: The maximum allowed value (inclusive) when the type is 'numeric_range'.
-          type: number
-        default:
-          example: END
-          description: The default value for the parameter when a parameter is optional.
-          anyOf:
-          - type: string
-          - type: integer
-            format: int32
-          - type: number
-            format: float
-          - type: boolean
-      required:
-      - parameter
-      - type
-      - value_type
-      - required
-    VectorType:
-      description: Indicates whether this is a 'dense' or 'sparse' embedding.
-      type: string
-    SparseEmbedding:
-      title: Sparse embedding
-      description: A sparse embedding of a single input
-      type: object
-      properties:
-        sparse_values:
+        values:
           example:
           - 0.1
           - 0.2
           - 0.3
-          description: The sparse embedding values.
+          description: The dense embedding values.
           type: array
           items:
             type: number
             format: float
-        sparse_indices:
-          example:
-          - 10
-          - 3
-          - 156
-          description: The sparse embedding indices.
-          type: array
-          items:
-            type: integer
-            format: int64
-            minimum: 0
-            maximum: 4294967295
-        sparse_tokens:
-          example:
-          - quick
-          - brown
-          - fox
-          description: The normalized tokens used to create the sparse embedding.
-          type: array
-          items:
-            type: string
         vector_type:
           $ref: '#/components/schemas/VectorType'
       required:
-      - sparse_values
-      - sparse_indices
+      - values
       - vector_type
-    ModelInfoSupportedMetrics:
-      description: The distance metrics supported by the model for similarity search.
-      type: array
-      items:
-        $ref: '#/components/schemas/ModelInfoMetric'
     Document:
       example:
         id: '1'
@@ -564,6 +468,44 @@ components:
       description: Document for reranking
       type: object
       additionalProperties: true
+    EmbedRequest:
+      type: object
+      properties:
+        model:
+          example: multilingual-e5-large
+          description: The [model](https://docs.pinecone.io/guides/index-data/create-an-index#embedding-models) to use for embedding generation.
+          type: string
+        parameters:
+          example:
+            input_type: passage
+            truncate: END
+          description: Additional model-specific parameters. Refer to the [model guide](https://docs.pinecone.io/guides/index-data/create-an-index#embedding-models) for available model parameters.
+          type: object
+          additionalProperties: true
+        inputs:
+          description: List of inputs to generate embeddings for.
+          type: array
+          items:
+            type: object
+            properties:
+              text:
+                example: The quick brown fox jumps over the lazy dog.
+                description: The text input to generate embeddings for.
+                type: string
+      required:
+      - model
+      - inputs
+    Embedding:
+      description: Embedding of a single input
+      discriminator:
+        propertyName: vector_type
+        mapping:
+          dense: '#/components/schemas/DenseEmbedding'
+          sparse: '#/components/schemas/SparseEmbedding'
+      type: object
+      oneOf:
+      - $ref: '#/components/schemas/DenseEmbedding'
+      - $ref: '#/components/schemas/SparseEmbedding'
     EmbeddingsList:
       description: Embeddings generated for the input.
       type: object
@@ -653,125 +595,6 @@ components:
       required:
       - status
       - error
-    RerankRequest:
-      type: object
-      properties:
-        model:
-          example: bge-reranker-v2-m3
-          description: The [model](https://docs.pinecone.io/guides/search/rerank-results#reranking-models) to use for reranking.
-          type: string
-        query:
-          example: What is the capital of France?
-          description: The query to rerank documents against.
-          type: string
-        top_n:
-          example: 5
-          description: The number of results to return sorted by relevance. Defaults to the number of inputs.
-          type: integer
-        return_documents:
-          example: true
-          description: Whether to return the documents in the response.
-          default: true
-          type: boolean
-        rank_fields:
-          description: |
-            The field(s) to consider for reranking. If not provided, the default is `["text"]`.
-
-            The number of fields supported is [model-specific](https://docs.pinecone.io/guides/search/rerank-results#reranking-models).
-          default:
-          - text
-          type: array
-          items:
-            type: string
-        documents:
-          description: The documents to rerank.
-          type: array
-          items:
-            $ref: '#/components/schemas/Document'
-        parameters:
-          example:
-            truncate: END
-          description: Additional model-specific parameters. Refer to the [model guide](https://docs.pinecone.io/guides/search/rerank-results#reranking-models) for available model parameters.
-          type: object
-          additionalProperties: true
-      required:
-      - model
-      - documents
-      - query
-    ModelInfoList:
-      description: The list of available models.
-      type: object
-      properties:
-        models:
-          description: List of available models.
-          type: array
-          items:
-            $ref: '#/components/schemas/ModelInfo'
-    RerankResult:
-      description: The result of a reranking request.
-      type: object
-      properties:
-        model:
-          example: bge-reranker-v2-m3
-          description: The model used to rerank documents.
-          type: string
-        data:
-          description: The reranked documents.
-          type: array
-          items:
-            $ref: '#/components/schemas/RankedDocument'
-        usage:
-          description: Usage statistics for the model inference.
-          type: object
-          properties:
-            rerank_units:
-              example: 1
-              description: The number of rerank units consumed by this operation.
-              type: integer
-              format: int32
-              minimum: 0
-      required:
-      - model
-      - data
-      - usage
-    Embedding:
-      description: Embedding of a single input
-      discriminator:
-        propertyName: vector_type
-        mapping:
-          dense: '#/components/schemas/DenseEmbedding'
-          sparse: '#/components/schemas/SparseEmbedding'
-      type: object
-      oneOf:
-      - $ref: '#/components/schemas/DenseEmbedding'
-      - $ref: '#/components/schemas/SparseEmbedding'
-    EmbedRequest:
-      type: object
-      properties:
-        model:
-          example: multilingual-e5-large
-          description: The [model](https://docs.pinecone.io/guides/index-data/create-an-index#embedding-models) to use for embedding generation.
-          type: string
-        parameters:
-          example:
-            input_type: passage
-            truncate: END
-          description: Additional model-specific parameters. Refer to the [model guide](https://docs.pinecone.io/guides/index-data/create-an-index#embedding-models) for available model parameters.
-          type: object
-          additionalProperties: true
-        inputs:
-          description: List of inputs to generate embeddings for.
-          type: array
-          items:
-            type: object
-            properties:
-              text:
-                example: The quick brown fox jumps over the lazy dog.
-                description: The text input to generate embeddings for.
-                type: string
-      required:
-      - model
-      - inputs
     ModelInfo:
       description: Represents the model configuration including model type, supported parameters, and other model details.
       type: object
@@ -839,26 +662,86 @@ components:
       - short_description
       - type
       - supported_parameters
-    DenseEmbedding:
-      title: Dense embedding
-      description: A dense embedding of a single input
+    ModelInfoList:
+      description: The list of available models.
       type: object
       properties:
-        values:
-          example:
-          - 0.1
-          - 0.2
-          - 0.3
-          description: The dense embedding values.
+        models:
+          description: List of available models.
           type: array
           items:
-            type: number
+            $ref: '#/components/schemas/ModelInfo'
+    ModelInfoMetric:
+      description: |-
+        A distance metric that the embedding model supports for similarity searches.
+        Possible values: `cosine`, `euclidean`, or `dotproduct`.
+      x-enum:
+      - cosine
+      - euclidean
+      - dotproduct
+      type: string
+    ModelInfoSupportedMetrics:
+      description: The distance metrics supported by the model for similarity search.
+      type: array
+      items:
+        $ref: '#/components/schemas/ModelInfoMetric'
+    ModelInfoSupportedParameter:
+      description: Describes a parameter supported by the model, including parameter value constraints.
+      type: object
+      properties:
+        parameter:
+          example: input_type
+          description: The name of the parameter.
+          type: string
+        type:
+          example: one_of
+          description: |-
+            The parameter type e.g. 'one_of', 'numeric_range', or 'any'.
+
+            If the type is 'one_of', then 'allowed_values' will be set, and the value specified must be one of the allowed values. 'one_of' is only compatible with value_type 'string' or 'integer'.
+
+            If 'numeric_range', then 'min' and 'max' will be set, then the value specified must adhere to the value_type and must fall within the `[min, max]` range (inclusive).
+
+            If 'any' then any value is allowed, as long as it adheres to the value_type.
+          type: string
+        value_type:
+          example: string
+          description: The type of value the parameter accepts, e.g. 'string', 'integer', 'float', or 'boolean'.
+          type: string
+        required:
+          example: true
+          description: Whether the parameter is required (true) or optional (false).
+          type: boolean
+        allowed_values:
+          description: The allowed parameter values when the type is 'one_of'.
+          type: array
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+        min:
+          example: 1
+          description: The minimum allowed value (inclusive) when the type is 'numeric_range'.
+          type: number
+        max:
+          example: 1
+          description: The maximum allowed value (inclusive) when the type is 'numeric_range'.
+          type: number
+        default:
+          example: END
+          description: The default value for the parameter when a parameter is optional.
+          anyOf:
+          - type: string
+          - type: integer
+            format: int32
+          - type: number
             format: float
-        vector_type:
-          $ref: '#/components/schemas/VectorType'
+          - type: boolean
       required:
-      - values
-      - vector_type
+      - parameter
+      - type
+      - value_type
+      - required
     RankedDocument:
       description: A ranked document with a relevance score and an index position.
       type: object
@@ -875,6 +758,123 @@ components:
       required:
       - index
       - score
+    RerankRequest:
+      type: object
+      properties:
+        model:
+          example: bge-reranker-v2-m3
+          description: The [model](https://docs.pinecone.io/guides/search/rerank-results#reranking-models) to use for reranking.
+          type: string
+        query:
+          example: What is the capital of France?
+          description: The query to rerank documents against.
+          type: string
+        top_n:
+          example: 5
+          description: The number of results to return sorted by relevance. Defaults to the number of inputs.
+          type: integer
+        return_documents:
+          example: true
+          description: Whether to return the documents in the response.
+          default: true
+          type: boolean
+        rank_fields:
+          description: |
+            The field(s) to consider for reranking. If not provided, the default is `["text"]`.
+
+            The number of fields supported is [model-specific](https://docs.pinecone.io/guides/search/rerank-results#reranking-models).
+          default:
+          - text
+          type: array
+          items:
+            type: string
+        documents:
+          description: The documents to rerank.
+          type: array
+          items:
+            $ref: '#/components/schemas/Document'
+        parameters:
+          example:
+            truncate: END
+          description: Additional model-specific parameters. Refer to the [model guide](https://docs.pinecone.io/guides/search/rerank-results#reranking-models) for available model parameters.
+          type: object
+          additionalProperties: true
+      required:
+      - model
+      - documents
+      - query
+    RerankResult:
+      description: The result of a reranking request.
+      type: object
+      properties:
+        model:
+          example: bge-reranker-v2-m3
+          description: The model used to rerank documents.
+          type: string
+        data:
+          description: The reranked documents.
+          type: array
+          items:
+            $ref: '#/components/schemas/RankedDocument'
+        usage:
+          description: Usage statistics for the model inference.
+          type: object
+          properties:
+            rerank_units:
+              example: 1
+              description: The number of rerank units consumed by this operation.
+              type: integer
+              format: int32
+              minimum: 0
+      required:
+      - model
+      - data
+      - usage
+    SparseEmbedding:
+      title: Sparse embedding
+      description: A sparse embedding of a single input
+      type: object
+      properties:
+        sparse_values:
+          example:
+          - 0.1
+          - 0.2
+          - 0.3
+          description: The sparse embedding values.
+          type: array
+          items:
+            type: number
+            format: float
+        sparse_indices:
+          example:
+          - 10
+          - 3
+          - 156
+          description: The sparse embedding indices.
+          type: array
+          items:
+            type: integer
+            format: int64
+            minimum: 0
+            maximum: 4294967295
+        sparse_tokens:
+          example:
+          - quick
+          - brown
+          - fox
+          description: The normalized tokens used to create the sparse embedding.
+          type: array
+          items:
+            type: string
+        vector_type:
+          $ref: '#/components/schemas/VectorType'
+      required:
+      - sparse_values
+      - sparse_indices
+      - vector_type
+    VectorType:
+      description: Indicates whether this is a 'dense' or 'sparse' embedding.
+      type: string
   securitySchemes:
     ApiKeyAuth:
       type: apiKey
