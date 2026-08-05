@@ -78,6 +78,7 @@ paths:
       tags:
       - Auth
       summary: Exchange a Pinecone API key for a session token
+      operationId: login
       security: []
       requestBody:
         required: true
@@ -129,6 +130,7 @@ paths:
       tags:
       - Auth
       summary: Current identity (whoami)
+      operationId: get_identity
       responses:
         '200':
           description: The caller's identity
@@ -156,6 +158,7 @@ paths:
       tags:
       - Project
       summary: Get the active project
+      operationId: get_project
       responses:
         '200':
           description: The project, plus whether this deployment requires a workspace host
@@ -172,6 +175,7 @@ paths:
       tags:
       - Connectors
       summary: List the project's linked connectors
+      operationId: list_connectors
       parameters:
       - $ref: '#/components/parameters/ContextKindFilter'
       responses:
@@ -195,6 +199,7 @@ paths:
       tags:
       - Connectors
       summary: Get a connector
+      operationId: get_connector
       responses:
         '200':
           description: The connector
@@ -208,6 +213,7 @@ paths:
       tags:
       - Connectors
       summary: Unlink a connector
+      operationId: delete_connector
       responses:
         '200':
           description: Deleted
@@ -244,6 +250,7 @@ paths:
       summary: Start the OAuth link flow for a provider
       description: Returns an `authorize_url` for the user to open in a browser. The connector is persisted
         by the provider's OAuth redirect callback once the user approves access.
+      operationId: start_connector_oauth
       responses:
         '200':
           description: Authorization URL
@@ -271,6 +278,7 @@ paths:
       tags:
       - Connectors
       summary: Link a connector with an API key
+      operationId: create_connector
       requestBody:
         required: true
         content:
@@ -312,6 +320,7 @@ paths:
       tags:
       - Connectors
       summary: Browse a connector's folders/files
+      operationId: list_connector_items
       responses:
         '200':
           description: The folder browsed plus its children
@@ -340,6 +349,7 @@ paths:
       tags:
       - Connectors
       summary: List a context's connectors (with per-context enabled flag)
+      operationId: list_context_connectors
       responses:
         '200':
           description: Context connectors
@@ -364,6 +374,7 @@ paths:
       tags:
       - Connectors
       summary: Enable or disable a connector for a context
+      operationId: update_context_connector
       requestBody:
         required: true
         content:
@@ -393,6 +404,7 @@ paths:
       tags:
       - Contexts
       summary: List contexts (newest first, with stats)
+      operationId: list_contexts
       responses:
         '200':
           description: Contexts visible to the caller in the active project
@@ -410,6 +422,7 @@ paths:
         them (curate is explicit — there is no auto-curate). Optionally seed a `manifest`. A `work` context
         is the exception: it is queryable from day zero and is built from traces of work rather than source
         documents.'
+      operationId: create_context
       requestBody:
         required: true
         content:
@@ -442,6 +455,7 @@ paths:
       tags:
       - Contexts
       summary: Get a context
+      operationId: get_context
       responses:
         '200':
           description: The context
@@ -458,6 +472,7 @@ paths:
       description: All fields optional; absent leaves untouched. Empty string clears description/guide;
         `{}` clears the manifest back to defaults. A supplied manifest is validated against the manifest
         schema.
+      operationId: update_context
       requestBody:
         required: true
         content:
@@ -481,6 +496,7 @@ paths:
       tags:
       - Contexts
       summary: Delete a context (and its Pinecone indexes)
+      operationId: delete_context
       responses:
         '200':
           description: Deleted (empty body)
@@ -500,6 +516,7 @@ paths:
         target context in the same project, so the target's query and curate gates pass. It does not create
         the target — create it first with `POST /contexts`. The target's index stays empty until curated.
         The source must have been optimized (`last_optimized_at` set) and must not be optimizing.
+      operationId: fork_context
       requestBody:
         required: true
         content:
@@ -540,6 +557,7 @@ paths:
       summary: Get the context's manifest
       description: The context's pinned manifest document. A context with no pinned manifest returns `{}`
         — the runtime fills defaults. Writes go through the `manifest` field on `PUT /contexts/{slug}`.
+      operationId: get_context_manifest
       responses:
         '200':
           description: The manifest document
@@ -557,6 +575,7 @@ paths:
       tags:
       - Contexts
       summary: Per-context task statistics
+      operationId: get_context_task_stats
       responses:
         '200':
           description: Aggregate task counters
@@ -578,6 +597,7 @@ paths:
         — there is no auto-curate. Body is optional. Set `force: true` to do a full rebuild (use after
         editing the manifest); the default is an incremental curate. Search contexts only — a work context
         builds via `work`/`groom` instead.'
+      operationId: curate_context
       requestBody:
         content:
           application/json:
@@ -623,6 +643,7 @@ paths:
       description: 'The full ledger: per-source hashes, edges, corpus groups, chunk-id lineage, version
         pin, reclaim intents, pointers, and glossary. This pays an O(corpus) chunk-id-lineage read — use
         `GET /contexts/{slug}/curate/version/pin` on the per-turn path.'
+      operationId: get_curation_ledger
       responses:
         '200':
           description: Curation state
@@ -640,6 +661,7 @@ paths:
       tags:
       - Curation
       summary: Drop named sources from the index + ledger
+      operationId: delete_curated_sources
       requestBody:
         required: true
         content:
@@ -669,6 +691,7 @@ paths:
       description: Tunes the manifest from real query traffic and chains a forced re-curate. A body is
         required but every field in it is optional, so `{}` is valid — and a no-op when no `candidate_queries`
         are supplied. The context must have been curated, and only one optimize runs at a time.
+      operationId: optimize_context
       requestBody:
         required: true
         content:
@@ -727,6 +750,7 @@ paths:
       description: Inspects the uploaded source and proposes manifest-template matches, returned in the
         task's `output` (see `ExploreOutput`). Persists nothing on the index — review the proposal, then
         apply it via the manifest update + a forced curate. Body is optional.
+      operationId: explore_context
       requestBody:
         content:
           application/json:
@@ -762,6 +786,7 @@ paths:
         under the in-progress manifest (sent in the request body), returned as the task's `output` (see
         `ProfileEstimateOutput`). Persists nothing; the console polls it for the Design-page cost box.
         Body is optional.
+      operationId: profile_context
       requestBody:
         content:
           application/json:
@@ -794,6 +819,7 @@ paths:
       summary: Import source documents from a project connector
       description: Pull source documents from a linked project connector (Box, ...) into the context.
         Supply either `folder` or `files`. Stages the source only — curate explicitly before querying.
+      operationId: import_context_sources
       requestBody:
         required: true
         content:
@@ -853,6 +879,7 @@ paths:
       description: One file per request, max 2 GiB. Archives (`.zip`, `.tar`, `.tar.gz`, `.tgz`) are expanded
         by the import runtime. Stages the source only — it does not index anything. Curate explicitly
         with `POST /contexts/{slug}/curate` before querying.
+      operationId: upload_context_source
       requestBody:
         required: true
         content:
@@ -891,6 +918,7 @@ paths:
       tags:
       - Source Files
       summary: List the source file tree (root)
+      operationId: list_source_files
       responses:
         '200':
           description: Directory listing
@@ -911,6 +939,7 @@ paths:
       description: Aggregate counts. Under preview mode the response also carries the per-context quota
         (`max_files_per_context`, `max_bytes_per_context`, `used_files`, `used_bytes`); those fields are
         absent otherwise.
+      operationId: get_source_stats
       responses:
         '200':
           description: Counts
@@ -930,6 +959,7 @@ paths:
       summary: Flat manifest of source files (path, size, last_modified)
       description: Flat source-object inventory used to render the source page without walking the tree.
         Excludes the `_inbox/` staging directory.
+      operationId: get_source_manifest
       responses:
         '200':
           description: Source manifest
@@ -970,6 +1000,7 @@ paths:
       tags:
       - Source Files
       summary: List the source file tree under a path
+      operationId: list_source_files_by_path
       responses:
         '200':
           description: Directory listing
@@ -988,6 +1019,7 @@ paths:
       tags:
       - Source Files
       summary: Read a source file (raw bytes)
+      operationId: read_source_file
       responses:
         '200':
           description: File contents
@@ -1007,6 +1039,7 @@ paths:
       tags:
       - Source Files
       summary: Delete a source file
+      operationId: delete_source_file
       responses:
         '200':
           description: Deleted
@@ -1034,6 +1067,7 @@ paths:
       tags:
       - Knowledge
       summary: List curated knowledge (root)
+      operationId: list_knowledge
       responses:
         '200':
           description: Directory listing
@@ -1051,6 +1085,7 @@ paths:
       tags:
       - Knowledge
       summary: Knowledge file/dir/size counts
+      operationId: get_knowledge_stats
       responses:
         '200':
           description: Counts
@@ -1071,6 +1106,7 @@ paths:
       tags:
       - Knowledge
       summary: List curated knowledge under a path
+      operationId: list_knowledge_by_path
       responses:
         '200':
           description: Directory listing
@@ -1089,6 +1125,7 @@ paths:
       tags:
       - Knowledge
       summary: Read a curated knowledge file (raw bytes)
+      operationId: read_knowledge_file
       responses:
         '200':
           description: File contents
@@ -1118,6 +1155,7 @@ paths:
         `response.output_text.delta`, `response.turn_rollup`, `response.synthesis`, `response.trace`,
         and a terminal `response.completed` / `response.failed` / `response.cancelled`), followed by a
         final `query` event carrying the full query object. Read the answer from `output[].content[].text`.'
+      operationId: query
       requestBody:
         required: true
         content:
@@ -1171,6 +1209,7 @@ paths:
       tags:
       - Query
       summary: Fetch one query (turn)
+      operationId: get_query
       responses:
         '200':
           description: The query
@@ -1194,6 +1233,7 @@ paths:
       summary: Cancel an in-progress query turn
       description: Idempotent — an already-terminal query is returned unchanged. On success the turn's
         `status` becomes `cancelled`.
+      operationId: cancel_query
       responses:
         '200':
           description: The (now cancelled) query
@@ -1217,6 +1257,7 @@ paths:
       summary: Fetch the recorded trace for a query turn
       description: The per-turn debug trace (steps, tool calls, strategy, cost, rollup). Trace persistence
         is unconditional — every turn lands a trace blob — so this is available once the turn is terminal.
+      operationId: get_query_trace
       responses:
         '200':
           description: The trace document
@@ -1248,6 +1289,7 @@ paths:
       description: 'Server-sent event stream of the turn''s events as they land — the same `type`-named
         events POST /query emits with `stream: true`, but as a standalone, resumable subscription. Reconnect
         with `Last-Event-ID` to replay from where the stream dropped.'
+      operationId: stream_query_events
       responses:
         '200':
           description: SSE event stream; each `event:` name is the event `type` and `data:` is its JSON
@@ -1279,6 +1321,7 @@ paths:
       tags:
       - Query
       summary: Record thumbs-up/down feedback on a query turn
+      operationId: create_query_feedback
       requestBody:
         required: true
         content:
@@ -1315,6 +1358,7 @@ paths:
         model, every catalog entry, the tier → model-id map, per-phase defaults, and the curate-capable
         model ids. Only entries with `available: true` are selectable (others are coming soon and rejected
         with `400`).'
+      operationId: list_models
       responses:
         '200':
           description: The model catalog
@@ -1329,6 +1373,7 @@ paths:
       tags:
       - Query
       summary: List project-wide query sessions (newest first)
+      operationId: list_sessions
       parameters:
       - name: limit
         in: query
@@ -1364,6 +1409,7 @@ paths:
       tags:
       - Query
       summary: Get a session with its queries (conversation order)
+      operationId: get_session
       responses:
         '200':
           description: The session fields plus a `queries` array of query turns
@@ -1386,6 +1432,7 @@ paths:
       tags:
       - Query
       summary: Delete a session and its queries
+      operationId: delete_session
       responses:
         '200':
           description: Whether a session was actually removed
@@ -1407,6 +1454,7 @@ paths:
       summary: Project-wide task stats
       description: Aggregate task counters across the whole project (all contexts), broken down by state
         and workflow. The per-context equivalent is `GET /contexts/{slug}/tasks/stats`.
+      operationId: get_project_task_stats
       responses:
         '200':
           description: Aggregate task stats for the project
@@ -1452,6 +1500,7 @@ paths:
       - Manifest
       summary: List the built-in manifest templates
       description: The catalog the console seeds new contexts from.
+      operationId: list_manifest_templates
       responses:
         '200':
           description: Template catalog
@@ -1466,6 +1515,7 @@ paths:
       tags:
       - Tasks
       summary: List tasks (project-wide, paginated)
+      operationId: list_tasks
       parameters:
       - name: workflow
         in: query
@@ -1550,6 +1600,7 @@ paths:
       tags:
       - Tasks
       summary: Get a task (with steps)
+      operationId: get_task
       responses:
         '200':
           description: The task
@@ -1564,6 +1615,7 @@ paths:
       - Tasks
       summary: Cancel/terminate a task
       description: Body is optional. Max body 1 MiB.
+      operationId: cancel_task
       requestBody:
         content:
           application/json:
@@ -1597,6 +1649,7 @@ paths:
       tags:
       - Tasks
       summary: Live token + runtime stats for a task
+      operationId: get_task_stats
       responses:
         '200':
           description: Task stats
@@ -1617,6 +1670,7 @@ paths:
       summary: Read a task file (raw bytes)
       description: Serves from the live container while the task runs, and from the archived blob store
         afterwards. This is how a finished pack's `<slug>.context.zip` is downloaded.
+      operationId: read_task_file
       responses:
         '200':
           description: File contents
@@ -1648,6 +1702,7 @@ paths:
       tags:
       - Task Files
       summary: Stat a task file
+      operationId: get_task_file_metadata
       responses:
         '200':
           description: File metadata — the archived or the live shape, depending on task state
@@ -1668,6 +1723,7 @@ paths:
       tags:
       - Task Files
       summary: List a task's files under a path
+      operationId: list_task_files_by_path
       responses:
         '200':
           description: Directory listing
@@ -1687,6 +1743,7 @@ paths:
       tags:
       - Task Files
       summary: List a task's working-directory files
+      operationId: list_task_files
       responses:
         '200':
           description: Directory listing
@@ -1705,6 +1762,7 @@ paths:
       tags:
       - Task Files
       summary: Delete a task file
+      operationId: delete_task_file
       responses:
         '200':
           description: Deleted
