@@ -5097,10 +5097,11 @@ components:
   parameters:
     ApiVersionHeader:
       in: header
-      name: X-Pinecone-API-Version
-      description: Date-based contract version. Omit to resolve to the oldest served version (`2026-07`);
-        send `unstable` for the in-development surface. The resolved version is echoed back on the same
-        header. A present-but-unrecognized value is rejected with `400 unsupported_api_version`.
+      name: X-Pinecone-Api-Version
+      description: Date-based contract version. Omit to resolve to the Nexus default version (`2026-07`, the
+        oldest served version); send `unstable` for the in-development surface. The resolved version is
+        echoed back on the same header. A present-but-unrecognized value is rejected with `400
+        unsupported_api_version`.
       required: false
       style: simple
       schema:
