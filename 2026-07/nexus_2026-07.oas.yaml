@@ -1,0 +1,5192 @@
+openapi: 3.0.3
+info:
+  title: Nexus API
+  contact:
+    name: Pinecone Support
+    url: https://support.pinecone.io
+    email: support@pinecone.io
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+  version: 2026-07
+  description: >
+    Nexus turns a set of sources into a queryable, self-improving knowledge
+    base. A context is **sources + a manifest**: upload sources, **curate**
+    them into a searchable index (curate is explicit — there is no
+    auto-curate), and then query the context. The manifest (a single validated
+    JSON document) defines how the context indexes, retrieves, and answers.
+
+
+    Conventions:
+
+
+      * The `{slug}` path parameter accepts the URL-safe context slug **or**
+        its UUID.
+
+      * Contexts return a `ContextResponse` (derived flags), not the raw
+        persisted model. Tasks return a `TaskResponse`.
+
+      * Querying is the unified KnowQL Query API: `POST /api/query` runs one
+        turn (`ask` in, answer out); multi-turn conversations are **sessions**
+        (`GET/DELETE /api/sessions`, `GET /api/queries/{id}`). Read the
+        answer from `output[].content[].text`.
+
+      * Tasks are a top-level, project-owned resource at `/api/tasks` —
+        they are no longer nested under contexts. Active workflow types are
+        `optimize`, `curate`, `search`, `search_cc`, `search_rag`, `explore`,
+        `profile`, `import`, `pack`, `restore`.
+servers:
+- url: https://{host}/api
+  description: Your Nexus deployment host
+  variables:
+    host:
+      default: api.example.com
+security:
+- bearerAuth: []
+- apiKey: []
+tags:
+- name: Auth
+  description: Login and identity.
+- name: Project
+  description: The active Pinecone project and its disclosure state.
+- name: Contexts
+  description: A context is sources + a manifest. Curate it explicitly before querying.
+- name: Manifest
+  description: Manifest templates and the per-context manifest.
+- name: Source Files
+  description: Per-context source imports (upload, connector, public repo) and the source file tree.
+- name: Knowledge
+  description: Read-only browse of curated knowledge (chunks + artifacts).
+- name: Curation
+  description: Curate workflow trigger, curation ledger, and version-pin primitives.
+- name: Connectors
+  description: Project-level links to external source providers (Box, ...). Linked via OAuth or an API
+    key, then used to import source documents into a context.
+- name: Query
+  description: 'The unified KnowQL Query API: run a query turn (`/query`), fetch a turn (`/queries/{id}`),
+    inspect its trace, manage feedback, comparison flags, and multi-turn sessions (`/sessions`).'
+- name: Tasks
+  description: Top-level, project-owned task records for every workflow (optimize, curate, search, work,
+    explore, profile, import, pack, restore, groom).
+- name: Task Files
+  description: Read, list, and delete files from live or archived task containers.
+paths:
+  /auth/login:
+    parameters:
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    post:
+      tags:
+      - Auth
+      summary: Exchange a Pinecone API key for a session token
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                api_key:
+                  type: string
+                  description: Pinecone API key. Optional — when absent, the server falls back to its
+                    configured key (managed) or validates the seeded credential (BYOC).
+      responses:
+        '200':
+          description: Session token + identity
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - token
+                - principal
+                - project_id
+                - project_name
+                properties:
+                  token:
+                    type: string
+                  principal:
+                    type: string
+                  project_id:
+                    type: string
+                  project_name:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: No workspace exists at this host (`workspace_not_found`), on a workspace-enabled
+            cluster.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /auth:
+    parameters:
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Auth
+      summary: Current identity (whoami)
+      operationId: get_identity
+      responses:
+        '200':
+          description: The caller's identity
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - user
+                - project_id
+                properties:
+                  user:
+                    type: string
+                  project_id:
+                    type: string
+                  project_name:
+                    type: string
+                    nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /project:
+    parameters:
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Project
+      summary: Get the active project
+      operationId: get_project
+      responses:
+        '200':
+          description: The project, plus whether this deployment requires a workspace host
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectWithWorkspaces'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /connectors:
+    parameters:
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Connectors
+      summary: List the project's linked connectors
+      operationId: list_connectors
+      parameters:
+      - $ref: '#/components/parameters/ContextKindFilter'
+      responses:
+        '200':
+          description: Linked connectors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConnectorView'
+  /connectors/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Connectors
+      summary: Get a connector
+      operationId: get_connector
+      responses:
+        '200':
+          description: The connector
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectorView'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+      - Connectors
+      summary: Unlink a connector
+      operationId: delete_connector
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - deleted
+                properties:
+                  deleted:
+                    type: string
+                    description: The deleted connector id
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /connectors/oauth/{provider}/start:
+    parameters:
+    - name: provider
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Provider id (e.g. box)
+    - name: return_to
+      in: query
+      required: false
+      schema:
+        type: string
+      description: Console path to bounce back to after the callback
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Connectors
+      summary: Start the OAuth link flow for a provider
+      description: Returns an `authorize_url` for the user to open in a browser. The connector is persisted
+        by the provider's OAuth redirect callback once the user approves access.
+      operationId: start_connector_oauth
+      responses:
+        '200':
+          description: Authorization URL
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - authorize_url
+                properties:
+                  authorize_url:
+                    type: string
+        '400':
+          description: Unknown provider, or the provider is key-based
+  /connectors/keys/{provider}:
+    parameters:
+    - name: provider
+      in: path
+      required: true
+      schema:
+        type: string
+      description: A key-based provider (e.g. parallel)
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    post:
+      tags:
+      - Connectors
+      summary: Link a connector with an API key
+      operationId: create_connector
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - api_key
+              properties:
+                api_key:
+                  type: string
+                account_label:
+                  type: string
+                  description: Optional display label
+      responses:
+        '200':
+          description: The linked connector
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectorView'
+        '400':
+          description: Unknown provider, provider uses OAuth, or empty api_key
+  /connectors/{id}/items:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    - name: folder
+      in: query
+      required: false
+      schema:
+        type: string
+      description: Folder id to browse (root when absent)
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Connectors
+      summary: Browse a connector's folders/files
+      operationId: list_connector_items
+      responses:
+        '200':
+          description: The folder browsed plus its children
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - folder
+                - items
+                properties:
+                  folder:
+                    type: string
+                    description: The folder id that was browsed
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ConnectorItem'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /contexts/{slug}/connectors:
+    parameters:
+    - $ref: '#/components/parameters/ContextSlug'
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Connectors
+      summary: List a context's connectors (with per-context enabled flag)
+      operationId: list_context_connectors
+      responses:
+        '200':
+          description: Context connectors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ContextConnectorView'
+        '404':
+          description: Context not found
+  /contexts/{slug}/connectors/{connector_id}:
+    parameters:
+    - $ref: '#/components/parameters/ContextSlug'
+    - name: connector_id
+      in: path
+      required: true
+      schema:
+        type: string
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    put:
+      tags:
+      - Connectors
+      summary: Enable or disable a connector for a context
+      operationId: update_context_connector
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - enabled
+              properties:
+                enabled:
+                  type: boolean
+      responses:
+        '200':
+          description: The updated context connector
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContextConnectorView'
+        '400':
+          description: Provider does not support this context kind
+        '404':
+          description: Context or connector not found
+  /contexts:
+    parameters:
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Contexts
+      summary: List contexts (newest first, with stats)
+      operationId: list_contexts
+      responses:
+        '200':
+          description: Contexts visible to the caller in the active project
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ContextResponse'
+    post:
+      tags:
+      - Contexts
+      summary: Create a context
+      description: 'The context is created empty and is not queryable until you import sources and curate
+        them (curate is explicit — there is no auto-curate). Optionally seed a `manifest`. A `work` context
+        is the exception: it is queryable from day zero and is built from traces of work rather than source
+        documents.'
+      operationId: create_context
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateContextRequest'
+      responses:
+        '200':
+          description: The created context
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContextResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          description: Project not enabled for the Nexus preview (`preview_not_enabled`), or a per-plan
+            context cap blocks creation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Slug already exists
+  /contexts/{slug}:
+    parameters:
+    - $ref: '#/components/parameters/ContextSlug'
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Contexts
+      summary: Get a context
+      operationId: get_context
+      responses:
+        '200':
+          description: The context
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContextResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags:
+      - Contexts
+      summary: Update a context
+      description: All fields optional; absent leaves untouched. Empty string clears description/guide;
+        `{}` clears the manifest back to defaults. A supplied manifest is validated against the manifest
+        schema.
+      operationId: update_context
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateContextRequest'
+      responses:
+        '200':
+          description: The updated context
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContextResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Slug conflict
+    delete:
+      tags:
+      - Contexts
+      summary: Delete a context (and its Pinecone indexes)
+      operationId: delete_context
+      responses:
+        '200':
+          description: Deleted (empty body)
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '504':
+          description: Active tasks did not terminate in time
+  /contexts/{slug}/fork:
+    parameters:
+    - $ref: '#/components/parameters/ContextSlug'
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    post:
+      tags:
+      - Contexts
+      summary: Fork a context (copy manifest into a fresh target)
+      description: Copies the source context's manifest and lifecycle metadata onto an **already-created**
+        target context in the same project, so the target's query and curate gates pass. It does not create
+        the target — create it first with `POST /contexts`. The target's index stays empty until curated.
+        The source must have been optimized (`last_optimized_at` set) and must not be optimizing.
+      operationId: fork_context
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - target_slug
+              properties:
+                target_slug:
+                  type: string
+                  description: Slug or UUID of an existing context in the same project
+      responses:
+        '200':
+          description: Forked
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                properties:
+                  success:
+                    type: boolean
+        '400':
+          description: Source and target are the same context
+        '404':
+          description: Source or target context not found
+        '409':
+          description: Source is optimizing, or has never been optimized
+  /contexts/{slug}/manifest:
+    parameters:
+    - $ref: '#/components/parameters/ContextSlug'
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Manifest
+      summary: Get the context's manifest
+      description: The context's pinned manifest document. A context with no pinned manifest returns `{}`
+        — the runtime fills defaults. Writes go through the `manifest` field on `PUT /contexts/{slug}`.
+      operationId: get_context_manifest
+      responses:
+        '200':
+          description: The manifest document
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Manifest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /contexts/{slug}/tasks/stats:
+    parameters:
+    - $ref: '#/components/parameters/ContextSlug'
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Contexts
+      summary: Per-context task statistics
+      operationId: get_context_task_stats
+      responses:
+        '200':
+          description: Aggregate task counters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContextStats'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /contexts/{slug}/curate:
+    parameters:
+    - $ref: '#/components/parameters/ContextSlug'
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    post:
+      tags:
+      - Curation
+      summary: (Re)build the context's index from its sources
+      description: 'Curate the staged sources under the active manifest. **Required before querying**
+        — there is no auto-curate. Body is optional. Set `force: true` to do a full rebuild (use after
+        editing the manifest); the default is an incremental curate. Search contexts only — a work context
+        builds via `work`/`groom` instead.'
+      operationId: curate_context
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                force:
+                  type: boolean
+                  default: false
+                  description: Full rebuild rather than incremental
+                batch_size:
+                  type: integer
+                  description: Curation batch size
+                scope:
+                  type: string
+                  description: Curate scope recorded on the task input
+                trigger:
+                  type: string
+                  description: Provenance label recorded on the task input
+                model:
+                  type: string
+                  description: Model-id override for the curate runtime
+                pinecone_api_key:
+                  type: string
+                  description: Task-token override; normally not needed
+      responses:
+        '200':
+          description: 'Curate enqueued (`state: importing`)'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowTriggerResponse'
+        '400':
+          description: Context is a work context
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Context has no sources, is optimizing, or hit the preview task cap
+    get:
+      tags:
+      - Curation
+      summary: Get the curation ledger
+      description: 'The full ledger: per-source hashes, edges, corpus groups, chunk-id lineage, version
+        pin, reclaim intents, pointers, and glossary. This pays an O(corpus) chunk-id-lineage read — use
+        `GET /contexts/{slug}/curate/version/pin` on the per-turn path.'
+      operationId: get_curation_ledger
+      responses:
+        '200':
+          description: Curation state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurationState'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /contexts/{slug}/curate/delete-sources:
+    parameters:
+    - $ref: '#/components/parameters/ContextSlug'
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    post:
+      tags:
+      - Curation
+      summary: Drop named sources from the index + ledger
+      operationId: delete_curated_sources
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - sources
+              properties:
+                sources:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Done (empty body)
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /contexts/{slug}/optimize:
+    parameters:
+    - $ref: '#/components/parameters/ContextSlug'
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    post:
+      tags:
+      - Contexts
+      summary: Trigger an on-demand self-tuning optimize
+      description: Tunes the manifest from real query traffic and chains a forced re-curate. A body is
+        required but every field in it is optional, so `{}` is valid — and a no-op when no `candidate_queries`
+        are supplied. The context must have been curated, and only one optimize runs at a time.
+      operationId: optimize_context
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                eval_pass_rate_threshold:
+                  type: number
+                  format: double
+                retrieval_p90_latency_ms:
+                  type: integer
+                  format: int64
+                optimize_timeout_seconds:
+                  type: integer
+                  format: int64
+                  description: Default 7200
+                max_iterations:
+                  type: integer
+                  description: Default 20
+                max_tool_turns:
+                  type: integer
+                  description: Default 200
+                models:
+                  type: array
+                  items:
+                    type: string
+                  description: Model-id overrides passed to the optimize runtime
+                candidate_queries:
+                  type: array
+                  description: Recent query records to tune toward (absent = no-op)
+                  items:
+                    $ref: '#/components/schemas/CandidateQuery'
+                pinecone_api_key:
+                  type: string
+                  description: Task-token override; normally not needed
+      responses:
+        '200':
+          description: 'Optimize enqueued (`state: optimizing`)'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowTriggerResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Context is already optimizing or was never curated
+  /contexts/{slug}/explore:
+    parameters:
+    - $ref: '#/components/parameters/ContextSlug'
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    post:
+      tags:
+      - Contexts
+      summary: Run the Design-flow explore agent (propose a manifest)
+      description: Inspects the uploaded source and proposes manifest-template matches, returned in the
+        task's `output` (see `ExploreOutput`). Persists nothing on the index — review the proposal, then
+        apply it via the manifest update + a forced curate. Body is optional.
+      operationId: explore_context
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                guide:
+                  type: string
+                  description: High-level guidance to steer the proposal
+                pinecone_api_key:
+                  type: string
+                  description: Task-token override; normally not needed
+      responses:
+        '200':
+          description: 'Explore enqueued (`state: exploring`)'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowTriggerResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: An explore is already in progress
+  /contexts/{slug}/profile:
+    parameters:
+    - $ref: '#/components/parameters/ContextSlug'
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    post:
+      tags:
+      - Contexts
+      summary: Estimate the token + time cost of curating the in-progress manifest
+      description: Spins up the `profile` runtime to estimate the token + time cost of curating the sources
+        under the in-progress manifest (sent in the request body), returned as the task's `output` (see
+        `ProfileEstimateOutput`). Persists nothing; the console polls it for the Design-page cost box.
+        Body is optional.
+      operationId: profile_context
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                manifest:
+                  allOf:
+                  - $ref: '#/components/schemas/Manifest'
+                  description: In-progress manifest to estimate against (default {})
+                pinecone_api_key:
+                  type: string
+                  description: Task-token override; normally not needed
+      responses:
+        '200':
+          description: 'Profile enqueued (`state: profiling`)'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowTriggerResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /contexts/{slug}/import:
+    parameters:
+    - $ref: '#/components/parameters/ContextSlug'
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    post:
+      tags:
+      - Source Files
+      summary: Import source documents from a project connector
+      description: Pull source documents from a linked project connector (Box, ...) into the context.
+        Supply either `folder` or `files`. Stages the source only — curate explicitly before querying.
+      operationId: import_context_sources
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - connector_id
+              properties:
+                connector_id:
+                  type: string
+                folder:
+                  type: string
+                  description: Connector folder id to import
+                files:
+                  type: array
+                  items:
+                    type: string
+                  description: Connector file ids to import
+                item_type:
+                  type: string
+                  x-enum:
+                  - folder
+                  - file
+                  default: folder
+                path:
+                  type: string
+                  description: Subdirectory under the source tree (default uploads)
+      responses:
+        '200':
+          description: 'Import accepted (`state: importing`)'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowTriggerResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          description: Context or connector not found
+        '409':
+          description: Context is optimizing, or an import is already in flight
+  /contexts/{slug}/import/upload:
+    parameters:
+    - $ref: '#/components/parameters/ContextSlug'
+    - name: path
+      in: query
+      required: false
+      schema:
+        type: string
+        default: uploads
+      description: Subdirectory under the source tree
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    post:
+      tags:
+      - Source Files
+      summary: Upload a source file or archive
+      description: One file per request, max 2 GiB. Archives (`.zip`, `.tar`, `.tar.gz`, `.tgz`) are expanded
+        by the import runtime. Stages the source only — it does not index anything. Curate explicitly
+        with `POST /contexts/{slug}/curate` before querying.
+      operationId: upload_context_source
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: 'Upload accepted; import enqueued (`state: importing`)'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowTriggerResponse'
+        '400':
+          description: Missing/unsafe file name, or archives disallowed in preview
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Context is optimizing, an import is in flight, or the preview file cap was hit
+            (`preview_file_limit`)
+        '413':
+          description: File exceeds 2 GiB, or the preview byte cap was hit (`preview_byte_limit`)
+  /contexts/{slug}/source/list:
+    parameters:
+    - $ref: '#/components/parameters/ContextSlug'
+    - $ref: '#/components/parameters/Offset'
+    - $ref: '#/components/parameters/Limit'
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Source Files
+      summary: List the source file tree (root)
+      operationId: list_source_files
+      responses:
+        '200':
+          description: Directory listing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DirListing'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /contexts/{slug}/source/stats:
+    parameters:
+    - $ref: '#/components/parameters/ContextSlug'
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Source Files
+      summary: Source file/dir/size counts
+      description: Aggregate counts. Under preview mode the response also carries the per-context quota
+        (`max_files_per_context`, `max_bytes_per_context`, `used_files`, `used_bytes`); those fields are
+        absent otherwise.
+      operationId: get_source_stats
+      responses:
+        '200':
+          description: Counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceStats'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /contexts/{slug}/source/manifest:
+    parameters:
+    - $ref: '#/components/parameters/ContextSlug'
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Source Files
+      summary: Flat manifest of source files (path, size, last_modified)
+      description: Flat source-object inventory used to render the source page without walking the tree.
+        Excludes the `_inbox/` staging directory.
+      operationId: get_source_manifest
+      responses:
+        '200':
+          description: Source manifest
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - files
+                properties:
+                  files:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                      - path
+                      - size
+                      properties:
+                        path:
+                          type: string
+                        size:
+                          type: integer
+                          format: int64
+                        last_modified:
+                          type: string
+                          format: date-time
+                          nullable: true
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /contexts/{slug}/source/list/{path}:
+    parameters:
+    - $ref: '#/components/parameters/ContextSlug'
+    - $ref: '#/components/parameters/FilePath'
+    - $ref: '#/components/parameters/Offset'
+    - $ref: '#/components/parameters/Limit'
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Source Files
+      summary: List the source file tree under a path
+      operationId: list_source_files_by_path
+      responses:
+        '200':
+          description: Directory listing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DirListing'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /contexts/{slug}/source/read/{path}:
+    parameters:
+    - $ref: '#/components/parameters/ContextSlug'
+    - $ref: '#/components/parameters/FilePath'
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Source Files
+      summary: Read a source file (raw bytes)
+      operationId: read_source_file
+      responses:
+        '200':
+          description: File contents
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /contexts/{slug}/source/delete/{path}:
+    parameters:
+    - $ref: '#/components/parameters/ContextSlug'
+    - $ref: '#/components/parameters/FilePath'
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    delete:
+      tags:
+      - Source Files
+      summary: Delete a source file
+      operationId: delete_source_file
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - deleted
+                - path
+                properties:
+                  deleted:
+                    type: boolean
+                  path:
+                    type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /contexts/{slug}/knowledge/list:
+    parameters:
+    - $ref: '#/components/parameters/ContextSlug'
+    - $ref: '#/components/parameters/Offset'
+    - $ref: '#/components/parameters/Limit'
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Knowledge
+      summary: List curated knowledge (root)
+      operationId: list_knowledge
+      responses:
+        '200':
+          description: Directory listing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DirListing'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /contexts/{slug}/knowledge/stats:
+    parameters:
+    - $ref: '#/components/parameters/ContextSlug'
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Knowledge
+      summary: Knowledge file/dir/size counts
+      operationId: get_knowledge_stats
+      responses:
+        '200':
+          description: Counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileStats'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /contexts/{slug}/knowledge/list/{path}:
+    parameters:
+    - $ref: '#/components/parameters/ContextSlug'
+    - $ref: '#/components/parameters/FilePath'
+    - $ref: '#/components/parameters/Offset'
+    - $ref: '#/components/parameters/Limit'
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Knowledge
+      summary: List curated knowledge under a path
+      operationId: list_knowledge_by_path
+      responses:
+        '200':
+          description: Directory listing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DirListing'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /contexts/{slug}/knowledge/read/{path}:
+    parameters:
+    - $ref: '#/components/parameters/ContextSlug'
+    - $ref: '#/components/parameters/FilePath'
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Knowledge
+      summary: Read a curated knowledge file (raw bytes)
+      operationId: read_knowledge_file
+      responses:
+        '200':
+          description: File contents
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /query:
+    parameters:
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    post:
+      tags:
+      - Query
+      summary: Run one KnowQL query turn
+      description: 'Send `ask` (the natural-language question) and, when starting a new session, a `scope`
+        of 1–10 contexts. Continue an existing session with `session_id` or `previous_query_id`. Scoped
+        search contexts must be curated (work contexts are queryable immediately), and a scope may not
+        mix work and search contexts.
+
+
+        `stream` and `background` are mutually exclusive. With `background: true` the API returns `202`
+        with an `in_progress` query and the client polls `GET /queries/{id}`. With `stream: true` the
+        API emits an SSE stream whose `event:` names are the event `type` (`response.created`, `response.step`,
+        `response.output_text.delta`, `response.turn_rollup`, `response.synthesis`, `response.trace`,
+        and a terminal `response.completed` / `response.failed` / `response.cancelled`), followed by a
+        final `query` event carrying the full query object. Read the answer from `output[].content[].text`.'
+      operationId: query
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryRequest'
+      responses:
+        '200':
+          description: The completed query turn (synchronous), or the SSE stream when `stream=true`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Query'
+            text/event-stream:
+              schema:
+                description: 'Server-sent event stream. While the turn runs, each progress frame has an
+                  `id:` (the event''s sequence number — send it back as the `Last-Event-ID` header to
+                  resume), an `event:` name equal to the QueryEvent `type` (e.g. `response.step`), and
+                  that QueryEvent as its JSON `data:`. When the turn finishes, a final frame named `event:
+                  query` is sent — no `id:`, with the full Query document as `data:`.
+
+                  '
+                oneOf:
+                - $ref: '#/components/schemas/QueryEvent'
+                - $ref: '#/components/schemas/Query'
+        '202':
+          description: Accepted (background); poll GET /queries/{id}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Query'
+        '400':
+          description: Missing/invalid `ask`, mixed-kind scope, unavailable model, or stream+background
+            together
+        '404':
+          description: Scoped context, session, or previous_query_id not found
+        '409':
+          description: A scoped context is not curated, a query is already in flight on the session, or
+            a preview cap was hit
+        '504':
+          description: Turn timed out (15-minute cap, or a lower `timeout_seconds`)
+  /queries/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Query
+      summary: Fetch one query (turn)
+      operationId: get_query
+      responses:
+        '200':
+          description: The query
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Query'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /queries/{id}/cancel:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    post:
+      tags:
+      - Query
+      summary: Cancel an in-progress query turn
+      description: Idempotent — an already-terminal query is returned unchanged. On success the turn's
+        `status` becomes `cancelled`.
+      operationId: cancel_query
+      responses:
+        '200':
+          description: The (now cancelled) query
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Query'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /queries/{id}/trace:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Query
+      summary: Fetch the recorded trace for a query turn
+      description: The per-turn debug trace (steps, tool calls, strategy, cost, rollup). Trace persistence
+        is unconditional — every turn lands a trace blob — so this is available once the turn is terminal.
+      operationId: get_query_trace
+      responses:
+        '200':
+          description: The trace document
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trace'
+        '404':
+          description: Query or trace not found
+  /queries/{id}/events:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    - name: Last-Event-ID
+      in: header
+      required: false
+      schema:
+        type: string
+      description: Resume from this event seq; delivery is inclusive of the given id (re-sending the last
+        event is harmless — clients merge steps idempotently by step_id).
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Query
+      summary: Stream a query turn's events (SSE)
+      description: 'Server-sent event stream of the turn''s events as they land — the same `type`-named
+        events POST /query emits with `stream: true`, but as a standalone, resumable subscription. Reconnect
+        with `Last-Event-ID` to replay from where the stream dropped.'
+      operationId: stream_query_events
+      responses:
+        '200':
+          description: SSE event stream; each `event:` name is the event `type` and `data:` is its JSON
+            payload.
+          content:
+            text/event-stream:
+              schema:
+                description: 'Server-sent event stream. While the turn runs, each progress frame has an
+                  `id:` (the event''s sequence number — send it back as the `Last-Event-ID` header to
+                  resume), an `event:` name equal to the QueryEvent `type` (e.g. `response.step`), and
+                  that QueryEvent as its JSON `data:`. When the turn finishes, a final frame named `event:
+                  query` is sent — no `id:`, with the full Query document as `data:`.
+
+                  '
+                oneOf:
+                - $ref: '#/components/schemas/QueryEvent'
+                - $ref: '#/components/schemas/Query'
+        '404':
+          description: Query not found
+  /queries/{id}/feedback:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    post:
+      tags:
+      - Query
+      summary: Record thumbs-up/down feedback on a query turn
+      operationId: create_query_feedback
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - rating
+              properties:
+                rating:
+                  type: string
+                  x-enum:
+                  - up
+                  - down
+                comment:
+                  type: string
+                  maxLength: 2000
+                  description: Optional, trimmed
+      responses:
+        '204':
+          description: Recorded (empty body)
+        '400':
+          description: Invalid rating
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /models:
+    parameters:
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Query
+      summary: List the selectable query models
+      description: 'The model catalog the `model` field on `POST /query` draws from. Returns the default
+        model, every catalog entry, the tier → model-id map, per-phase defaults, and the curate-capable
+        model ids. Only entries with `available: true` are selectable (others are coming soon and rejected
+        with `400`).'
+      operationId: list_models
+      responses:
+        '200':
+          description: The model catalog
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelCatalog'
+  /sessions:
+    parameters:
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Query
+      summary: List project-wide query sessions (newest first)
+      operationId: list_sessions
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 50
+          minimum: 1
+          maximum: 200
+      responses:
+        '200':
+          description: Sessions across the project
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - sessions
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Session'
+  /sessions/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Query
+      summary: Get a session with its queries (conversation order)
+      operationId: get_session
+      responses:
+        '200':
+          description: The session fields plus a `queries` array of query turns
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Session'
+                - type: object
+                  required:
+                  - queries
+                  properties:
+                    queries:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/Query'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+      - Query
+      summary: Delete a session and its queries
+      operationId: delete_session
+      responses:
+        '200':
+          description: Whether a session was actually removed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - deleted
+                properties:
+                  deleted:
+                    type: boolean
+  /stats:
+    parameters:
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Project
+      summary: Project-wide task stats
+      description: Aggregate task counters across the whole project (all contexts), broken down by state
+        and workflow. The per-context equivalent is `GET /contexts/{slug}/tasks/stats`.
+      operationId: get_project_task_stats
+      responses:
+        '200':
+          description: Aggregate task stats for the project
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - tasks_total
+                - tasks_active
+                - tasks_completed
+                - tasks_cancelled
+                - tasks_by_state
+                - tasks_by_workflow
+                - captured_at
+                properties:
+                  tasks_total:
+                    type: integer
+                  tasks_active:
+                    type: integer
+                  tasks_completed:
+                    type: integer
+                  tasks_cancelled:
+                    type: integer
+                  tasks_by_state:
+                    type: object
+                    additionalProperties:
+                      type: integer
+                    description: Keyed by `TaskState`
+                  tasks_by_workflow:
+                    type: object
+                    additionalProperties:
+                      type: integer
+                    description: Keyed by `Workflow`
+                  captured_at:
+                    type: string
+                    format: date-time
+  /manifest/templates:
+    parameters:
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Manifest
+      summary: List the built-in manifest templates
+      description: The catalog the console seeds new contexts from.
+      operationId: list_manifest_templates
+      responses:
+        '200':
+          description: Template catalog
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManifestTemplateCatalog'
+  /tasks:
+    parameters:
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Tasks
+      summary: List tasks (project-wide, paginated)
+      operationId: list_tasks
+      parameters:
+      - name: workflow
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/Workflow'
+      - name: state
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/TaskState'
+      - name: context
+        in: query
+        required: false
+        schema:
+          type: string
+        description: Context slug or UUID
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+        description: Free-text over id/created_by/input
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 30
+          minimum: 1
+          maximum: 1000
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 1
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Paginated tasks
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - items
+                - total
+                - limit
+                - offset
+                - page
+                - pages
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TaskResponse'
+                  total:
+                    type: integer
+                    format: int64
+                  limit:
+                    type: integer
+                    format: int64
+                  offset:
+                    type: integer
+                    format: int64
+                  page:
+                    type: integer
+                    format: int64
+                  pages:
+                    type: integer
+                    format: int64
+  /tasks/{id}:
+    parameters:
+    - $ref: '#/components/parameters/TaskId'
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Tasks
+      summary: Get a task (with steps)
+      operationId: get_task
+      responses:
+        '200':
+          description: The task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+      - Tasks
+      summary: Cancel/terminate a task
+      description: Body is optional. Max body 1 MiB.
+      operationId: cancel_task
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                target:
+                  type: string
+                pushed:
+                  type: boolean
+                  description: Set by a self-terminating runtime that already pushed its outputs; tells
+                    the orchestrator it may skip the exec pull.
+                pinecone_api_key:
+                  type: string
+                user_token:
+                  type: string
+      responses:
+        '200':
+          description: Termination enqueued (empty body)
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '504':
+          description: Task did not terminate in time
+  /tasks/{id}/stats:
+    parameters:
+    - $ref: '#/components/parameters/TaskId'
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Tasks
+      summary: Live token + runtime stats for a task
+      operationId: get_task_stats
+      responses:
+        '200':
+          description: Task stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskStats'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /tasks/{id}/files/read/{path}:
+    parameters:
+    - $ref: '#/components/parameters/TaskId'
+    - $ref: '#/components/parameters/FilePath'
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Task Files
+      summary: Read a task file (raw bytes)
+      description: Serves from the live container while the task runs, and from the archived blob store
+        afterwards. This is how a finished pack's `<slug>.context.zip` is downloaded.
+      operationId: read_task_file
+      responses:
+        '200':
+          description: File contents
+          headers:
+            x-nexus-file-size:
+              schema:
+                type: integer
+                format: int64
+              description: Byte size, when known.
+            x-nexus-stale:
+              schema:
+                type: string
+                x-enum:
+                - 'true'
+              description: Present when the bytes came from a stale archive copy.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /tasks/{id}/files/metadata/{path}:
+    parameters:
+    - $ref: '#/components/parameters/TaskId'
+    - $ref: '#/components/parameters/FilePath'
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Task Files
+      summary: Stat a task file
+      operationId: get_task_file_metadata
+      responses:
+        '200':
+          description: File metadata — the archived or the live shape, depending on task state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskFileMetadata'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /tasks/{id}/files/list/{path}:
+    parameters:
+    - $ref: '#/components/parameters/TaskId'
+    - $ref: '#/components/parameters/FilePath'
+    - $ref: '#/components/parameters/Offset'
+    - $ref: '#/components/parameters/Limit'
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Task Files
+      summary: List a task's files under a path
+      operationId: list_task_files_by_path
+      responses:
+        '200':
+          description: Directory listing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskFileListing'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /tasks/{id}/files/list:
+    parameters:
+    - $ref: '#/components/parameters/TaskId'
+    - $ref: '#/components/parameters/Offset'
+    - $ref: '#/components/parameters/Limit'
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    get:
+      tags:
+      - Task Files
+      summary: List a task's working-directory files
+      operationId: list_task_files
+      responses:
+        '200':
+          description: Directory listing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskFileListing'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /tasks/{id}/files/delete/{path}:
+    parameters:
+    - $ref: '#/components/parameters/TaskId'
+    - $ref: '#/components/parameters/FilePath'
+    - $ref: '#/components/parameters/ApiVersionHeader'
+    delete:
+      tags:
+      - Task Files
+      summary: Delete a task file
+      operationId: delete_task_file
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - deleted
+                properties:
+                  deleted:
+                    type: boolean
+                  path:
+                    type: string
+                    description: Absent on the API's no-result fallback
+        '404':
+          $ref: '#/components/responses/NotFound'
+components:
+  schemas:
+    Error:
+      type: object
+      required:
+      - message
+      description: The error envelope every non-2xx response uses.
+      properties:
+        message:
+          type: string
+        code:
+          type: string
+          description: 'Stable machine-readable code, present only on errors a client must branch on. '
+          x-enum:
+          - unsupported_api_version
+          - preview_not_enabled
+          - preview_file_limit
+          - preview_byte_limit
+          - workspace_host_required
+          - workspace_not_found
+    Project:
+      type: object
+      required:
+      - id
+      - name
+      - created_at
+      - updated_at
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ProjectWithWorkspaces:
+      allOf:
+      - $ref: '#/components/schemas/Project'
+      - type: object
+        required:
+        - workspaces_required
+        properties:
+          workspaces_required:
+            type: boolean
+            description: True on a workspace-enabled cluster, where requests must use the `wksp.*` workspace
+              host rather than the account host.
+    ContextKind:
+      type: string
+      x-enum:
+      - search
+      - work
+      default: search
+      description: '`search` — built from source documents; must be curated before it can be queried.
+        `work` — built from traces of work done; queryable immediately and consolidated by `groom` rather
+        than `curate`.'
+    Workflow:
+      type: string
+      x-enum:
+      - optimize
+      - curate
+      - search
+      - search_cc
+      - search_rag
+      - work
+      - explore
+      - profile
+      - import
+      - pack
+      - restore
+      - groom
+      description: The canonical workflow name. Legacy aliases (`build`, `query`, `query_search`, `query_sac`,
+        `query_cc`, `query_rag`, `response`, `agent`, `session`) are still accepted on input and normalized
+        to the canonical value.
+    TaskState:
+      type: string
+      x-enum:
+      - scheduled
+      - starting
+      - provisioning
+      - running
+      - stopping
+      - completed
+      - cancelled
+      - failed
+    ContextStats:
+      type: object
+      required:
+      - tasks_total
+      - tasks_active
+      - tasks_completed
+      - tasks_failed
+      - tasks_cancelled
+      - tokens_total
+      - runtime_seconds
+      properties:
+        tasks_total:
+          type: integer
+          format: int64
+        tasks_active:
+          type: integer
+          format: int64
+        tasks_completed:
+          type: integer
+          format: int64
+        tasks_failed:
+          type: integer
+          format: int64
+        tasks_cancelled:
+          type: integer
+          format: int64
+        tokens_total:
+          type: integer
+          format: int64
+        runtime_seconds:
+          type: integer
+          format: int64
+    TemplateMatch:
+      type: object
+      required:
+      - template_id
+      - rationale
+      - confidence
+      properties:
+        template_id:
+          type: string
+        rationale:
+          type: string
+        confidence:
+          type: number
+          format: double
+    ManifestSuggestion:
+      type: object
+      required:
+      - matches
+      - none
+      - explored_at
+      description: Outcome of a Design-flow explore run, pinned to the context row.
+      properties:
+        matches:
+          type: array
+          items:
+            $ref: '#/components/schemas/TemplateMatch'
+        none:
+          type: boolean
+          description: True when no template fit
+        explored_at:
+          type: string
+          format: date-time
+        task_id:
+          type: string
+    ContextResponse:
+      type: object
+      description: What context endpoints return (derived flags).
+      required:
+      - id
+      - slug
+      - name
+      - kind
+      - created_by
+      - description
+      - is_optimizing
+      - has_sources
+      - is_curating
+      - is_importing
+      - is_exploring
+      - is_restoring
+      - is_grooming
+      - created_at
+      - updated_at
+      properties:
+        id:
+          type: string
+        slug:
+          type: string
+        name:
+          type: string
+        kind:
+          $ref: '#/components/schemas/ContextKind'
+        workspace:
+          type: string
+          description: Present only on a workspace-enabled cluster
+        created_by:
+          type: string
+        description:
+          type: string
+          nullable: true
+        guide:
+          type: string
+          description: High-level guidance for the query runtime
+        manifest:
+          allOf:
+          - $ref: '#/components/schemas/Manifest'
+          description: Pinned manifest document; absent when the context is on defaults
+        is_optimizing:
+          type: boolean
+        optimize_task_id:
+          type: string
+          nullable: true
+        optimize_score:
+          type: number
+          format: double
+          nullable: true
+        optimize_iterations:
+          type: integer
+          nullable: true
+        last_optimized_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_curated_at:
+          type: string
+          format: date-time
+          nullable: true
+        has_sources:
+          type: boolean
+        last_source_import_at:
+          type: string
+          format: date-time
+          nullable: true
+        is_curating:
+          type: boolean
+        curate_task_id:
+          type: string
+          nullable: true
+        is_importing:
+          type: boolean
+        import_task_id:
+          type: string
+          nullable: true
+        is_exploring:
+          type: boolean
+        explore_task_id:
+          type: string
+          nullable: true
+        is_restoring:
+          type: boolean
+        restore_task_id:
+          type: string
+          nullable: true
+        manifest_suggestion:
+          $ref: '#/components/schemas/ManifestSuggestion'
+        sample_queries:
+          type: array
+          items:
+            type: string
+          description: Example questions the curated corpus can answer
+        is_grooming:
+          type: boolean
+        groom_task_id:
+          type: string
+        groom_artifact_count:
+          type: integer
+          format: int64
+        last_groomed_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        stats:
+          allOf:
+          - $ref: '#/components/schemas/ContextStats'
+          description: Populated only on the list endpoint
+    CreateContextRequest:
+      type: object
+      required:
+      - slug
+      - name
+      properties:
+        slug:
+          type: string
+          description: 3–64 chars, lowercase alnum + hyphens, starts with a letter
+        name:
+          type: string
+          description: 1–128 chars
+        description:
+          type: string
+        guide:
+          type: string
+        manifest:
+          allOf:
+          - $ref: '#/components/schemas/Manifest'
+          description: Seed manifest (validated against the manifest schema)
+        kind:
+          $ref: '#/components/schemas/ContextKind'
+    UpdateContextRequest:
+      type: object
+      description: All fields optional. Empty string for description/guide clears it; `{}` for manifest
+        clears it back to defaults. Absent leaves untouched. `kind` is immutable and cannot be updated.
+      properties:
+        slug:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        guide:
+          type: string
+        manifest:
+          $ref: '#/components/schemas/Manifest'
+    WorkflowTriggerResponse:
+      type: object
+      required:
+      - task_id
+      - state
+      description: The uniform acknowledgment every context-workflow trigger returns. `state` is the forward-looking
+        status; the per-workflow boolean flags are legacy and set only for the workflows that historically
+        emitted them.
+      properties:
+        task_id:
+          type: string
+        state:
+          type: string
+          x-enum:
+          - optimizing
+          - grooming
+          - exploring
+          - profiling
+          - importing
+        exploring:
+          type: boolean
+          description: Legacy flag; present only for explore
+        profiling:
+          type: boolean
+          description: Legacy flag; present only for profile
+        importing:
+          type: boolean
+          description: Legacy flag; present only for the import/curate triggers
+    DirListing:
+      type: object
+      required:
+      - entries
+      - total
+      - offset
+      - limit
+      description: A paginated source/knowledge directory listing.
+      properties:
+        entries:
+          type: array
+          items:
+            type: object
+            required:
+            - name
+            - kind
+            - size
+            - mtime
+            properties:
+              name:
+                type: string
+              kind:
+                type: string
+                x-enum:
+                - dir
+                - file
+              size:
+                type: integer
+                format: int64
+              mtime:
+                type: string
+                description: RFC3339 last-modified, or empty when the store reports none
+        total:
+          type: integer
+          format: int64
+        offset:
+          type: integer
+          format: int64
+        limit:
+          type: integer
+          format: int64
+        next_offset:
+          type: integer
+          format: int64
+          nullable: true
+    FileStats:
+      type: object
+      required:
+      - file_count
+      - dir_count
+      - total_size
+      properties:
+        file_count:
+          type: integer
+          format: int64
+        dir_count:
+          type: integer
+          format: int64
+        total_size:
+          type: integer
+          format: int64
+    SourceStats:
+      allOf:
+      - $ref: '#/components/schemas/FileStats'
+      - type: object
+        description: Quota fields are present only under preview mode.
+        properties:
+          max_files_per_context:
+            type: integer
+            format: int64
+          max_bytes_per_context:
+            type: integer
+            format: int64
+          used_files:
+            type: integer
+            format: int64
+          used_bytes:
+            type: integer
+            format: int64
+    TaskFileListing:
+      type: object
+      required:
+      - entries
+      - total
+      - offset
+      - limit
+      description: A task's file listing. A running task's entries carry `mode`; an archived task's do
+        not.
+      properties:
+        entries:
+          type: array
+          items:
+            type: object
+            required:
+            - name
+            - kind
+            - size
+            - mtime
+            properties:
+              name:
+                type: string
+              kind:
+                type: string
+                x-enum:
+                - dir
+                - file
+              size:
+                type: integer
+                format: int64
+              mode:
+                type: string
+                description: Running tasks only
+              mtime:
+                type: string
+        total:
+          type: integer
+          format: int64
+        offset:
+          type: integer
+          format: int64
+        limit:
+          type: integer
+          format: int64
+        next_offset:
+          type: integer
+          format: int64
+          nullable: true
+    TaskFileMetadata:
+      oneOf:
+      - type: object
+        title: Archived
+        required:
+        - is_dir
+        - is_file
+        - size
+        properties:
+          is_dir:
+            type: boolean
+          is_file:
+            type: boolean
+          size:
+            type: integer
+            format: int64
+          modified:
+            type: integer
+            format: int64
+            nullable: true
+            description: Unix seconds
+      - type: object
+        title: Live
+        required:
+        - kind
+        - size
+        - mode
+        - mtime
+        properties:
+          kind:
+            type: string
+          size:
+            type: integer
+            format: int64
+          mode:
+            type: string
+          mtime:
+            type: string
+          link_target:
+            type: string
+    Manifest:
+      type: object
+      description: The context manifest that drives curate and search. A sparse document — every field
+        is optional and an omitted key falls back to the validator default, so absent fields are omitted
+        rather than nulled. Value constraints are enforced by the write-side validator.
+      properties:
+        curate:
+          $ref: '#/components/schemas/CurateManifest'
+        optimize:
+          $ref: '#/components/schemas/OptimizeManifest'
+    CurateManifest:
+      type: object
+      properties:
+        chunks:
+          $ref: '#/components/schemas/ChunksConfig'
+        artifacts:
+          $ref: '#/components/schemas/ArtifactsConfig'
+    ChunksConfig:
+      type: object
+      description: Source chunking + embedding config.
+      properties:
+        enabled:
+          type: boolean
+          default: true
+        embedding_model:
+          type: string
+          maxLength: 128
+          default: multilingual-e5-large
+        chunking:
+          $ref: '#/components/schemas/ChunkingConfig'
+        keyword:
+          type: object
+          properties:
+            enabled:
+              type: boolean
+              default: true
+    ChunkingConfig:
+      type: object
+      properties:
+        strategy:
+          type: string
+          x-enum:
+          - markdown_heading
+          - sliding_window
+          - html
+          - csv
+          - code
+          default: markdown_heading
+        target_size:
+          type: integer
+          minimum: 64
+          maximum: 4096
+          default: 512
+        overlap:
+          type: integer
+          minimum: 0
+          maximum: 1024
+          default: 64
+        respect_sections:
+          type: boolean
+          default: true
+    ArtifactsConfig:
+      type: object
+      description: Knowledge-artifact extraction config.
+      properties:
+        enabled:
+          type: boolean
+          default: false
+        artifact_model:
+          type: string
+          x-enum:
+          - standard
+          - lite
+          default: lite
+        artifact_types:
+          type: array
+          maxItems: 32
+          items:
+            $ref: '#/components/schemas/ArtifactType'
+        edge_types:
+          type: array
+          maxItems: 32
+          items:
+            $ref: '#/components/schemas/EdgeType'
+        min_doc_count:
+          type: integer
+          minimum: 1
+          maximum: 64
+          default: 1
+        max_tokens:
+          type: integer
+          minimum: 128
+          maximum: 8192
+          default: 1500
+        max_doc_chars:
+          type: integer
+          minimum: 1000
+          maximum: 2000000
+          default: 60000
+        extraction_window_chars:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+          default: 0
+        mention_max_chars:
+          type: integer
+          minimum: 100
+          maximum: 4000
+          default: 400
+        max_mentions_per_artifact:
+          type: integer
+          minimum: 1
+          maximum: 500
+          default: 40
+        mention_context_chars:
+          type: integer
+          minimum: 1000
+          maximum: 100000
+          default: 8000
+        max_artifacts_per_type:
+          type: integer
+          minimum: 1
+          maximum: 10000
+          default: 10000
+    ArtifactType:
+      type: object
+      required:
+      - name
+      properties:
+        name:
+          type: string
+          maxLength: 64
+        kind:
+          type: string
+          x-enum:
+          - summary
+          - topic
+          - entity
+          - event
+          - doc
+          - page
+          - glossary
+          default: topic
+        scope:
+          type: string
+          x-enum:
+          - document
+          - corpus
+          default: corpus
+        icon:
+          type: string
+        description:
+          type: string
+        coverage:
+          type: array
+          maxItems: 32
+          items:
+            type: string
+            maxLength: 128
+        sections:
+          type: array
+          maxItems: 64
+          items:
+            type: string
+            maxLength: 128
+        min_doc_count:
+          type: integer
+          minimum: 1
+          maximum: 64
+          default: 1
+        format:
+          type: string
+          x-enum:
+          - markdown
+          - sqlite
+          default: markdown
+        columns:
+          type: array
+          maxItems: 64
+          description: sqlite-format artifacts only
+          items:
+            type: object
+            required:
+            - name
+            properties:
+              name:
+                type: string
+                maxLength: 64
+              type:
+                type: string
+                x-enum:
+                - TEXT
+                - INTEGER
+                - REAL
+                - NUMERIC
+                default: TEXT
+              description:
+                type: string
+        natural_key:
+          type: array
+          maxItems: 16
+          items:
+            type: string
+            maxLength: 64
+    EdgeType:
+      type: object
+      required:
+      - name
+      - from
+      - to
+      properties:
+        name:
+          type: string
+          maxLength: 64
+        from:
+          type: string
+          maxLength: 64
+          description: Source artifact-type name
+        to:
+          type: string
+          maxLength: 64
+          description: Target artifact-type name
+        description:
+          type: string
+        attributes:
+          type: array
+          maxItems: 16
+          items:
+            type: string
+            maxLength: 64
+    OptimizeManifest:
+      type: object
+      description: Scheduled self-tuning config.
+      properties:
+        schedule:
+          type: string
+          maxLength: 128
+          default: 0 * * * *
+          description: cron
+        latency_threshold_ms:
+          type: integer
+          minimum: 0
+          maximum: 600000
+          default: 60000
+        min_group_size:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 2
+        eval_pass_rate_threshold:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+          default: 1
+        max_iterations:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+    ManifestTemplateCatalog:
+      type: object
+      required:
+      - version
+      - default_id
+      - templates
+      properties:
+        version:
+          type: integer
+          format: int64
+        default_id:
+          type: string
+        templates:
+          type: array
+          items:
+            $ref: '#/components/schemas/ManifestTemplate'
+    ManifestTemplate:
+      type: object
+      required:
+      - id
+      - label
+      - description
+      - when_to_use
+      - default
+      - sample_questions
+      - manifest
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        description:
+          type: string
+        when_to_use:
+          type: string
+        default:
+          type: boolean
+          description: True on the catalog's default template
+        sample_questions:
+          type: array
+          items:
+            type: string
+        manifest:
+          $ref: '#/components/schemas/Manifest'
+    SourceManifestEntry:
+      type: object
+      required:
+      - hash
+      - curated_at
+      properties:
+        hash:
+          type: string
+        curated_at:
+          type: string
+          format: date-time
+        size:
+          type: integer
+          format: int64
+          default: 0
+        mtime:
+          type: string
+          format: date-time
+          nullable: true
+    CorpusGroup:
+      type: object
+      required:
+      - group_key
+      - member_sources
+      - canonical_name
+      - membership_hash
+      properties:
+        group_key:
+          type: string
+        member_sources:
+          type: array
+          items:
+            type: string
+        canonical_name:
+          type: string
+        membership_hash:
+          type: string
+        added_version:
+          type: integer
+          format: int64
+          default: 0
+    PointerEntry:
+      type: object
+      required:
+      - type
+      - name
+      properties:
+        type:
+          type: string
+          description: Artifact-type name
+        name:
+          type: string
+        mention:
+          type: string
+        seq:
+          type: integer
+    GlossaryEntry:
+      type: object
+      required:
+      - type
+      - name
+      - clause
+      properties:
+        type:
+          type: string
+        name:
+          type: string
+        clause:
+          type: string
+    ArtifactReclaim:
+      type: object
+      required:
+      - removed_id
+      - added_id
+      - version
+      properties:
+        removed_id:
+          type: string
+        added_id:
+          type: string
+        version:
+          type: integer
+          format: int64
+    ChunkReclaim:
+      type: object
+      required:
+      - source
+      - removed_version
+      - chunk_ids
+      properties:
+        source:
+          type: string
+        removed_version:
+          type: integer
+          format: int64
+        chunk_ids:
+          type: array
+          items:
+            type: string
+    SourceRemoved:
+      type: object
+      required:
+      - removed_version
+      description: A deferred whole-source delete tombstone.
+      properties:
+        removed_version:
+          type: integer
+          format: int64
+        removed_at:
+          type: string
+          format: date-time
+          nullable: true
+    CurationState:
+      type: object
+      required:
+      - manifest
+      - edges
+      - corpus_groups
+      - chunk_ids
+      - live_version
+      - versions_stamped
+      - source_removed
+      - redispatch_count
+      - artifact_reclaim
+      - chunk_reclaim
+      - source_pointers
+      - source_glossary
+      properties:
+        manifest:
+          type: object
+          description: Per-source curate ledger, keyed by source path.
+          additionalProperties:
+            $ref: '#/components/schemas/SourceManifestEntry'
+        edges:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+        corpus_groups:
+          type: array
+          items:
+            $ref: '#/components/schemas/CorpusGroup'
+        chunk_ids:
+          type: object
+          description: Chunk-id lineage, keyed by source path.
+          additionalProperties:
+            type: array
+            items:
+              type: string
+        live_version:
+          type: integer
+          format: int64
+        versions_stamped:
+          type: boolean
+        source_removed:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/SourceRemoved'
+        redispatch_count:
+          type: integer
+        artifact_reclaim:
+          type: array
+          items:
+            $ref: '#/components/schemas/ArtifactReclaim'
+        chunk_reclaim:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChunkReclaim'
+        source_pointers:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              $ref: '#/components/schemas/PointerEntry'
+        source_glossary:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              $ref: '#/components/schemas/GlossaryEntry'
+    PackDetails:
+      type: object
+      description: Publisher-facing pack enrichment.
+      properties:
+        description:
+          type: string
+        sample_queries:
+          type: array
+          items:
+            type: string
+    PackTaskOutput:
+      type: object
+      required:
+      - state
+      description: A pack task's output, discriminated by `state`. Fields are per-state; absent fields
+        are omitted rather than nulled.
+      properties:
+        state:
+          type: string
+          x-enum:
+          - running
+          - completed
+          - failed
+          - unknown
+        slug:
+          type: string
+        include_traces:
+          type: boolean
+        started_at:
+          type: string
+        completed_at:
+          type: string
+        enriching:
+          type: boolean
+        sources_total:
+          type: integer
+          format: int64
+        knowledge_total:
+          type: integer
+          format: int64
+        traces_total:
+          type: integer
+          format: int64
+        files_written:
+          type: integer
+          format: int64
+        bytes_collected:
+          type: integer
+          format: int64
+        pack_filename:
+          type: string
+        pack_size:
+          type: integer
+          format: int64
+        sources_files:
+          type: integer
+          format: int64
+        knowledge_files:
+          type: integer
+          format: int64
+        traces_included:
+          type: boolean
+        traces_files:
+          type: integer
+          format: int64
+        corpus_groups_included:
+          type: integer
+          format: int64
+        details:
+          $ref: '#/components/schemas/PackDetails'
+        error:
+          type: string
+    ConnectorView:
+      type: object
+      required:
+      - id
+      - provider
+      - created_at
+      - updated_at
+      description: The connector view returned by connector endpoints (secrets stripped). There is no
+        `config` field — no provider populates one today.
+      properties:
+        id:
+          type: string
+        provider:
+          type: string
+          description: e.g. box
+        account_label:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ContextConnectorView:
+      allOf:
+      - $ref: '#/components/schemas/ConnectorView'
+      - type: object
+        required:
+        - enabled
+        description: A project connector with its per-context enabled flag.
+        properties:
+          enabled:
+            type: boolean
+    ConnectorItem:
+      type: object
+      required:
+      - id
+      - name
+      - type
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          x-enum:
+          - file
+          - folder
+        size:
+          type: integer
+          format: int64
+          description: Files only, when the provider reports it
+    QueryRequest:
+      type: object
+      required:
+      - ask
+      description: A single KnowQL query turn. `scope` and the session-config fields (`system_prompt`,
+        `guardrails`, `model`/`models`, `tools`) are honored only when starting a NEW session
+        and are pinned for its life; continue an existing session with `session_id` or `previous_query_id`.
+        The per-turn controls (`workflow`, `shape`, `max_steps`, `thinking_level`, `compose`, `retrieval_only`/`pointers_only`,
+        `chunks_only`/`artifacts_only`, `max_retrieved`/`max_retrieved_chars`) ride the turn and are not
+        pinned to the session.
+      properties:
+        ask:
+          type: string
+          description: The natural-language question
+        scope:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items:
+            type: string
+          description: Context slugs/UUIDs. New session only; pinned for the session's life. A scope may
+            not mix work and search contexts.
+        session_id:
+          type: string
+          description: Continue an existing session
+        previous_query_id:
+          type: string
+          description: Continue the session this query belongs to
+        workflow:
+          type: string
+          x-enum:
+          - search
+          - search_cc
+          - search_rag
+          description: Search workflow for this turn. Legacy aliases `query_search`/`query_sac`, `query_cc`,
+            `query_rag` are still accepted on input. Ignored for work contexts, which always run the `work`
+            runtime.
+        system_prompt:
+          type: string
+          description: Instructions pinned to a new session
+        guardrails:
+          type: string
+          description: Guardrails pinned to a new session
+        shape:
+          type: object
+          additionalProperties: true
+          description: JSON Schema subset for structured output; result in output_json
+        model:
+          type: string
+          description: provider/model
+        models:
+          type: array
+          items:
+            type: string
+          description: Ordered fallback list; takes precedence over model
+        tools:
+          type: array
+          items:
+            type: string
+        stream:
+          type: boolean
+          description: SSE streaming. Mutually exclusive with background.
+        background:
+          type: boolean
+          description: 'Fire-and-forget: 202 + in_progress query; poll GET /queries/{id}. Mutually exclusive
+            with stream.'
+        timeout_seconds:
+          type: integer
+          format: int64
+          description: May only LOWER the 15-minute (900s) cap
+        max_steps:
+          type: integer
+          format: int64
+          description: Cap the agent's tool-loop steps for this turn
+        thinking_level:
+          type: string
+          x-enum:
+          - minimal
+          - low
+          - medium
+          - high
+          description: Gemini reasoning depth. Default `low`. Gemini-backed workflows only; ignored for
+            `search_cc`.
+        compose:
+          type: boolean
+          description: '`false` skips synthesis (alias for `retrieval_only`)'
+        retrieval_only:
+          type: boolean
+          description: Skip synthesis; return retrieved hits in `output_json`
+        pointers_only:
+          type: boolean
+          description: Skip synthesis; return just pointers in `output_json`
+        chunks_only:
+          type: boolean
+          description: Retrieval-only, narrowed to chunks
+        artifacts_only:
+          type: boolean
+          description: Retrieval-only, narrowed to artifacts
+        max_retrieved:
+          type: integer
+          format: int64
+          description: Cap the item count for retrieval-only turns
+        max_retrieved_chars:
+          type: integer
+          format: int64
+          description: Cap per-item verbatim text length for retrieval-only turns
+        comparison_group:
+          type: string
+          description: Client-generated id shared by the turns of one Compare run, so the preview per-project
+            query cap treats them as a single action. The group is size-bounded server-side (max 3 turns).
+            Omit for a normal single query.
+    QueryComparisonMember:
+      type: object
+      required:
+      - workflow
+      - query_id
+      properties:
+        workflow:
+          type: string
+        query_id:
+          type: string
+        model:
+          type: string
+    Citation:
+      type: object
+      required:
+      - source
+      description: A cited source in a completed turn's answer.
+      properties:
+        source:
+          type: string
+        section_paths:
+          type: array
+          items:
+            type: array
+            items:
+              type: string
+          description: Heading paths within the source, when known.
+        pages:
+          type: array
+          items:
+            type: integer
+            format: int64
+        grounding:
+          type: string
+        kind:
+          type: string
+    QueryStep:
+      type: object
+      required:
+      - step_id
+      - status
+      - commentary
+      properties:
+        step_id:
+          type: string
+        status:
+          type: string
+        commentary:
+          type: string
+        fns:
+          type: array
+          items:
+            type: string
+        code:
+          type: string
+        cum_input_tokens:
+          type: integer
+          format: int64
+        cum_output_tokens:
+          type: integer
+          format: int64
+    Query:
+      type: object
+      required:
+      - id
+      - object
+      - session_id
+      - created
+      - status
+      - input
+      - output
+      - citations
+      - steps
+      - usage
+      - runtime_ms
+      description: One query turn. Read the answer from `output[].content[].text`.
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          x-enum:
+          - query
+        session_id:
+          type: string
+        model:
+          type: string
+          nullable: true
+        created:
+          type: integer
+          format: int64
+          description: Unix seconds
+        status:
+          type: string
+          x-enum:
+          - in_progress
+          - completed
+          - failed
+          - cancelled
+        error:
+          type: string
+          nullable: true
+        previous_query_id:
+          type: string
+          nullable: true
+        comparison:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/QueryComparisonMember'
+        feedback:
+          type: object
+          nullable: true
+          required:
+          - rating
+          properties:
+            rating:
+              type: string
+              x-enum:
+              - up
+              - down
+            comment:
+              type: string
+              nullable: true
+        input:
+          type: array
+          description: The stored message array (plain-text `content`).
+          items:
+            type: object
+            required:
+            - role
+            - content
+            properties:
+              role:
+                type: string
+              content:
+                type: string
+        output:
+          type: array
+          description: 'Output items; assistant text is `{role, content:[{type: output_text, text}]}`'
+          items:
+            type: object
+            required:
+            - role
+            - content
+            properties:
+              role:
+                type: string
+              content:
+                type: array
+                items:
+                  type: object
+                  required:
+                  - type
+                  - text
+                  properties:
+                    type:
+                      type: string
+                      example: output_text
+                    text:
+                      type: string
+        output_json:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: Present when a shape was used, or on a retrieval-only turn
+        citations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Citation'
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/QueryStep'
+        rollup:
+          type: object
+          nullable: true
+          description: Per-turn token/cache totals + tool tally (`response.turn_rollup`)
+          properties:
+            type:
+              type: string
+              example: response.turn_rollup
+            query_id:
+              type: string
+            cache_read_tokens:
+              type: integer
+              format: int64
+            cache_write_tokens:
+              type: integer
+              format: int64
+            n_steps:
+              type: integer
+              format: int64
+            n_tool_calls:
+              type: integer
+              format: int64
+            by_category:
+              type: object
+              additionalProperties:
+                type: integer
+                format: int64
+            total_hits:
+              type: integer
+              format: int64
+            duration_ms:
+              type: integer
+              format: int64
+        synthesis:
+          type: object
+          nullable: true
+          description: Token/latency of the answer completion (`response.synthesis`)
+          properties:
+            type:
+              type: string
+              example: response.synthesis
+            query_id:
+              type: string
+            status:
+              type: string
+            tokens_in:
+              type: integer
+              format: int64
+            tokens_out:
+              type: integer
+              format: int64
+            ms:
+              type: integer
+              format: int64
+            answer_preview:
+              type: string
+            tokens_in_cached:
+              type: integer
+              format: int64
+            tokens_in_cache_write:
+              type: integer
+              format: int64
+            tokens_in_fresh:
+              type: integer
+              format: int64
+        trace_ref:
+          type: string
+          nullable: true
+          description: Blob key of the persisted trace
+        usage:
+          type: object
+          required:
+          - input_tokens
+          - output_tokens
+          - total_tokens
+          properties:
+            input_tokens:
+              type: integer
+              format: int64
+            output_tokens:
+              type: integer
+              format: int64
+            total_tokens:
+              type: integer
+              format: int64
+        runtime_ms:
+          type: integer
+          format: int64
+    Session:
+      type: object
+      required:
+      - id
+      - project_id
+      - created_by
+      - scope
+      - models
+      - tools
+      - created_at
+      - updated_at
+      description: A project-owned conversation thread of queries.
+      properties:
+        id:
+          type: string
+          description: ses_<uuid>
+        project_id:
+          type: string
+        workspace:
+          type: string
+          description: Present only on a workspace-enabled cluster
+        created_by:
+          type: string
+        scope:
+          type: array
+          items:
+            type: string
+          description: Pinned context UUIDs (1–10)
+        title:
+          type: string
+          nullable: true
+        system_prompt:
+          type: string
+          nullable: true
+        guardrails:
+          type: string
+          nullable: true
+        models:
+          type: array
+          items:
+            type: string
+          description: Pinned model fallback list
+        tools:
+          type: array
+          items:
+            type: string
+        workflow:
+          type: string
+          nullable: true
+          description: The workflow this session's turns run
+        last_query_id:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ModelCatalog:
+      type: object
+      required:
+      - default
+      - models
+      - tiers
+      - phase_defaults
+      - supported_curate_models
+      properties:
+        default:
+          type: string
+          description: Model id used when `model` is omitted
+        models:
+          type: array
+          items:
+            type: object
+            required:
+            - id
+            - label
+            - provider
+            - available
+            properties:
+              id:
+                type: string
+                description: provider/model id
+              label:
+                type: string
+              provider:
+                type: string
+              available:
+                type: boolean
+                description: Whether the model is currently selectable
+        tiers:
+          type: object
+          additionalProperties:
+            type: string
+          description: Tier (`lite`/`standard`/`pro`) → resolved model id
+        phase_defaults:
+          type: object
+          additionalProperties:
+            type: string
+          description: Workflow phase → default model id
+        supported_curate_models:
+          type: array
+          items:
+            type: string
+          description: Model ids accepted by the curate runtime
+    QueryEvent:
+      type: object
+      required:
+      - type
+      - query_id
+      description: One progress event on a query turn, discriminated by `type`. Emitted as SSE frames
+        on a streaming `POST /query`.
+      properties:
+        type:
+          type: string
+          x-enum:
+          - response.created
+          - response.step
+          - response.output_text.delta
+          - response.turn_rollup
+          - response.synthesis
+          - response.trace
+          - response.completed
+          - response.failed
+          - response.cancelled
+        query_id:
+          type: string
+        session_id:
+          type: string
+          description: '`response.created`'
+        delta:
+          type: string
+          description: '`response.output_text.delta`'
+        error:
+          type: string
+          description: '`response.failed` / `response.cancelled`'
+        trace_ref:
+          type: string
+          description: '`response.trace`'
+        step_id:
+          type: string
+          description: '`response.step`'
+        status:
+          type: string
+          description: '`response.step` (running/completed/failed), `response.synthesis` (completed)'
+        commentary:
+          type: string
+          description: '`response.step`'
+        fns:
+          type: array
+          items:
+            type: string
+          description: '`response.step`'
+        code:
+          type: string
+          description: '`response.step`'
+        cum_input_tokens:
+          type: integer
+          format: int64
+          description: '`response.step`'
+        cum_output_tokens:
+          type: integer
+          format: int64
+          description: '`response.step`'
+        n_steps:
+          type: integer
+          format: int64
+          description: '`response.turn_rollup`'
+        n_tool_calls:
+          type: integer
+          format: int64
+          description: '`response.turn_rollup`'
+        by_category:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+          description: '`response.turn_rollup`'
+        total_hits:
+          type: integer
+          format: int64
+          description: '`response.turn_rollup`'
+        duration_ms:
+          type: integer
+          format: int64
+          description: '`response.turn_rollup`'
+        cache_read_tokens:
+          type: integer
+          format: int64
+          description: '`response.turn_rollup`'
+        cache_write_tokens:
+          type: integer
+          format: int64
+          description: '`response.turn_rollup`'
+        tokens_in:
+          type: integer
+          format: int64
+          description: '`response.synthesis`'
+        tokens_out:
+          type: integer
+          format: int64
+          description: '`response.synthesis`'
+        ms:
+          type: integer
+          format: int64
+          description: '`response.synthesis`'
+        answer_preview:
+          type: string
+          description: '`response.synthesis`'
+        tokens_in_cached:
+          type: integer
+          format: int64
+          description: '`response.synthesis`'
+        tokens_in_cache_write:
+          type: integer
+          format: int64
+          description: '`response.synthesis`'
+        tokens_in_fresh:
+          type: integer
+          format: int64
+          description: '`response.synthesis`'
+    Trace:
+      type: object
+      description: A turn's full-fidelity debug trace.
+      properties:
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/TraceStep'
+        rollup:
+          type: object
+          nullable: true
+          required:
+          - n_steps
+          - n_tool_calls
+          - total_hits
+          - duration_ms
+          description: End-of-turn aggregate counters. The cache fields are present only on the search-as-code
+            path.
+          properties:
+            n_steps:
+              type: integer
+              format: int64
+            n_tool_calls:
+              type: integer
+              format: int64
+            by_category:
+              type: object
+              additionalProperties:
+                type: integer
+                format: int64
+            total_hits:
+              type: integer
+              format: int64
+            duration_ms:
+              type: integer
+              format: int64
+            cache_read_tokens:
+              type: integer
+              format: int64
+            cache_write_tokens:
+              type: integer
+              format: int64
+    TraceStep:
+      type: object
+      required:
+      - step_id
+      - commentary
+      - code
+      - strategy
+      description: One reasoning step — its generated code, tool calls, strategy, and cost.
+      properties:
+        step_id:
+          type: string
+        commentary:
+          type: string
+        code:
+          type: string
+        calls:
+          type: array
+          items:
+            $ref: '#/components/schemas/TraceCall'
+        strategy:
+          type: object
+          required:
+          - kind
+          - fns
+          - label
+          - scope
+          properties:
+            kind:
+              type: string
+            fns:
+              type: array
+              items:
+                type: string
+            label:
+              type: string
+            scope:
+              type: array
+              items:
+                type: string
+        cost:
+          type: object
+          required:
+          - tokens_in
+          - tokens_out
+          - decide_ms
+          - execute_ms
+          description: The step's incremental cost (deltas against the running turn cursor).
+          properties:
+            tokens_in:
+              type: integer
+              format: int64
+            tokens_out:
+              type: integer
+              format: int64
+            decide_ms:
+              type: integer
+              format: int64
+            execute_ms:
+              type: integer
+              format: int64
+            tokens_in_cached:
+              type: integer
+              format: int64
+            tokens_in_cache_write:
+              type: integer
+              format: int64
+            tokens_in_fresh:
+              type: integer
+              format: int64
+    TraceCall:
+      type: object
+      required:
+      - fn
+      - category
+      - args
+      - result
+      - duration_ms
+      - ok
+      description: One tool call within a step.
+      properties:
+        fn:
+          type: string
+        category:
+          type: string
+        args:
+          type: object
+          additionalProperties: true
+          description: Compact, redacted summary of the call's arguments. The key set is tool-specific
+            and deliberately open.
+        result:
+          description: Compact summary of the call's result (never the payload). The shape varies by category
+            and is runtime-extensible.
+        duration_ms:
+          type: integer
+          format: int64
+        ok:
+          type: boolean
+        score_space:
+          type: string
+        error:
+          type: string
+    TaskResponse:
+      type: object
+      required:
+      - id
+      - project_id
+      - created_by
+      - workflow
+      - state
+      - input
+      - steps
+      - tokens_prompt
+      - tokens_completion
+      - runtime_seconds
+      - created_at
+      properties:
+        id:
+          type: string
+        project_id:
+          type: string
+        context_id:
+          type: string
+          nullable: true
+        agent_id:
+          type: string
+          nullable: true
+        session_id:
+          type: string
+          nullable: true
+          description: Set for query turns
+        created_by:
+          type: string
+        workflow:
+          $ref: '#/components/schemas/Workflow'
+        state:
+          $ref: '#/components/schemas/TaskState'
+        error:
+          type: string
+          nullable: true
+        input:
+          $ref: '#/components/schemas/TaskInput'
+        output:
+          type: object
+          nullable: true
+          allOf:
+          - $ref: '#/components/schemas/TaskOutput'
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskStep'
+          description: Populated only on GET /tasks/{id}
+        tokens_prompt:
+          type: integer
+          format: int64
+        tokens_completion:
+          type: integer
+          format: int64
+        runtime_seconds:
+          type: integer
+          format: int64
+        running_from:
+          type: string
+          format: date-time
+          nullable: true
+        timeout_seconds:
+          type: integer
+          nullable: true
+        timeout_at:
+          type: string
+          format: date-time
+          nullable: true
+        archived_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        last_activity_at:
+          type: string
+          format: date-time
+          nullable: true
+        schedule:
+          type: string
+          nullable: true
+        scheduled_at:
+          type: string
+          format: date-time
+          nullable: true
+        parent_task_id:
+          type: string
+          nullable: true
+        progress:
+          $ref: '#/components/schemas/TaskProgress'
+    TaskProgress:
+      type: object
+      required:
+      - phase
+      - phases
+      - label
+      - pct
+      description: Coarse task progress surfaced to the console.
+      properties:
+        phase:
+          type: integer
+          format: int64
+        phases:
+          type: integer
+          format: int64
+        label:
+          type: string
+        pct:
+          type: number
+          format: double
+        eta_seconds:
+          type: integer
+          format: int64
+          nullable: true
+    TaskStep:
+      type: object
+      required:
+      - step_id
+      - status
+      description: One reported step row. `step_id` and `status` are always set; the rest are per-call
+        optionals.
+      properties:
+        step_id:
+          type: string
+        status:
+          type: string
+        type:
+          type: string
+        commentary:
+          type: string
+        code:
+          type: string
+          description: Redacted tool input (search)
+        result:
+          type: string
+          description: Redacted tool output (search)
+        cum_input_tokens:
+          type: integer
+          format: int64
+        cum_output_tokens:
+          type: integer
+          format: int64
+        job_id:
+          type: string
+          description: LlamaParse job id
+        path:
+          type: string
+          description: Source path being parsed
+    TaskStats:
+      type: object
+      required:
+      - task_id
+      - tokens_prompt
+      - tokens_completion
+      - tokens_total
+      - runtime_seconds
+      - captured_at
+      properties:
+        task_id:
+          type: string
+        tokens_prompt:
+          type: integer
+          format: int64
+        tokens_completion:
+          type: integer
+          format: int64
+        tokens_total:
+          type: integer
+          format: int64
+        runtime_seconds:
+          type: integer
+          format: int64
+        captured_at:
+          type: string
+          format: date-time
+    TaskInput:
+      description: A task's per-workflow `input`, written once at creation and echoed back verbatim. It
+        carries no discriminant of its own — the sibling `workflow` field selects the shape.
+      anyOf:
+      - $ref: '#/components/schemas/SearchInput'
+      - $ref: '#/components/schemas/CurateInput'
+      - $ref: '#/components/schemas/ImportInput'
+      - $ref: '#/components/schemas/PackInput'
+      - $ref: '#/components/schemas/RestoreInput'
+      - $ref: '#/components/schemas/ExploreInput'
+      - $ref: '#/components/schemas/ProfileInput'
+      - $ref: '#/components/schemas/OptimizeInput'
+      - $ref: '#/components/schemas/GroomInput'
+    SearchInput:
+      type: object
+      title: search / search_cc / search_rag / work
+      required:
+      - session_id
+      - query_id
+      - ask
+      - messages
+      - models
+      - tools
+      - shape
+      - instructions
+      - scope
+      - turn_timeout_seconds
+      - retrieval
+      - comparison_group
+      properties:
+        session_id:
+          type: string
+        query_id:
+          type: string
+        ask:
+          type: string
+          description: Title fallback for the tasks UI; empty when the turn had no user message
+        messages:
+          type: array
+          items:
+            type: object
+            required:
+            - role
+            - content
+            properties:
+              role:
+                type: string
+              content:
+                type: string
+        models:
+          type: array
+          items:
+            type: string
+        tools:
+          type: array
+          items:
+            type: string
+        shape:
+          type: object
+          nullable: true
+          additionalProperties: true
+        instructions:
+          type: string
+          nullable: true
+        scope:
+          type: array
+          items:
+            type: string
+        turn_timeout_seconds:
+          type: integer
+          format: int64
+        retrieval:
+          type: object
+          description: The turn's retrieval controls; every key is written, `null` where the caller omitted
+            it.
+          required:
+          - retrieval_only
+          - pointers_only
+          - chunks_only
+          - artifacts_only
+          - max_retrieved
+          - max_retrieved_chars
+          - compose
+          - max_steps
+          - thinking_level
+          properties:
+            retrieval_only:
+              type: boolean
+              nullable: true
+            pointers_only:
+              type: boolean
+              nullable: true
+            chunks_only:
+              type: boolean
+              nullable: true
+            artifacts_only:
+              type: boolean
+              nullable: true
+            max_retrieved:
+              type: integer
+              format: int64
+              nullable: true
+            max_retrieved_chars:
+              type: integer
+              format: int64
+              nullable: true
+            compose:
+              type: boolean
+              nullable: true
+            max_steps:
+              type: integer
+              format: int64
+              nullable: true
+            thinking_level:
+              type: string
+              nullable: true
+              x-enum:
+              - minimal
+              - low
+              - medium
+              - high
+        comparison_group:
+          type: string
+          nullable: true
+    CurateInput:
+      type: object
+      title: curate
+      required:
+      - trigger
+      - force
+      - scope
+      properties:
+        trigger:
+          type: string
+          description: e.g. manual / reconcile / restore / resume
+        force:
+          type: boolean
+        scope:
+          type: string
+          description: e.g. full / reconcile / restore
+        batch_size:
+          type: integer
+        models:
+          type: array
+          items:
+            type: string
+        legs:
+          type: array
+          items:
+            type: string
+          description: '`["chunks"]` gates the run to the chunk + keyword indices, skipping artifact extraction'
+        artifacts_reset:
+          type: boolean
+        skip_corpus_aggregation:
+          type: boolean
+        claimed_version:
+          type: integer
+          format: int64
+          description: The version a drained predecessor had claimed
+    ImportInput:
+      title: import
+      description: One of three disjoint shapes, discriminated by which of `connector_id` / `url` / `raw_archive_key`
+        is present.
+      anyOf:
+      - type: object
+        title: Connector import
+        required:
+        - provider
+        - connector_id
+        - item_type
+        - files
+        - path
+        properties:
+          provider:
+            type: string
+          connector_id:
+            type: string
+          folder:
+            type: string
+            nullable: true
+          item_type:
+            type: string
+            x-enum:
+            - folder
+            - file
+          files:
+            type: array
+            items:
+              type: string
+          path:
+            type: string
+          preview:
+            $ref: '#/components/schemas/PreviewLimits'
+      - type: object
+        title: Public-repo import
+        required:
+        - provider
+        - url
+        - path
+        properties:
+          provider:
+            type: string
+          url:
+            type: string
+          path:
+            type: string
+          preview:
+            $ref: '#/components/schemas/PreviewLimits'
+      - type: object
+        title: Archive upload
+        required:
+        - raw_archive_key
+        - path
+        properties:
+          raw_archive_key:
+            type: string
+            description: Staging key under the source bucket's `_inbox/` prefix
+          path:
+            type: string
+          preview:
+            $ref: '#/components/schemas/PreviewLimits'
+    PreviewLimits:
+      type: object
+      required:
+      - allow_archives
+      - allowed_extensions
+      - remaining_files
+      - remaining_bytes
+      description: Preview-mode import caps grafted onto the input; absent outside preview mode.
+      properties:
+        allow_archives:
+          type: boolean
+        allowed_extensions:
+          type: array
+          items:
+            type: string
+        remaining_files:
+          type: integer
+          format: int64
+        remaining_bytes:
+          type: integer
+          format: int64
+    PackInput:
+      type: object
+      title: pack
+      required:
+      - include_traces
+      - slug
+      - context_id
+      properties:
+        include_traces:
+          type: boolean
+        slug:
+          type: string
+        context_id:
+          type: string
+    RestoreInput:
+      type: object
+      title: restore
+      required:
+      - pack_key
+      - pack_filename
+      - target_context_id
+      - target_slug
+      - target_name
+      properties:
+        pack_key:
+          type: string
+        pack_filename:
+          type: string
+        target_context_id:
+          type: string
+        target_slug:
+          type: string
+        target_name:
+          type: string
+    ExploreInput:
+      type: object
+      title: explore
+      required:
+      - guide
+      - trigger
+      properties:
+        guide:
+          type: string
+        trigger:
+          type: string
+    ProfileInput:
+      type: object
+      title: profile
+      required:
+      - manifest
+      - trigger
+      properties:
+        manifest:
+          allOf:
+          - $ref: '#/components/schemas/Manifest'
+          description: The candidate manifest the run profiles, not a stored one.
+        trigger:
+          type: string
+    CandidateQuery:
+      type: object
+      required:
+      - ask
+      description: A query the optimize run tunes toward.
+      properties:
+        ask:
+          type: string
+        answer:
+          type: string
+          description: Used as eval ground truth
+        fallback_to_chunks:
+          type: boolean
+        latency_ms:
+          type: number
+          format: double
+    OptimizeInput:
+      type: object
+      title: optimize
+      description: Every field optional — an input with no keys is a valid no-op optimize.
+      properties:
+        candidate_queries:
+          type: array
+          items:
+            $ref: '#/components/schemas/CandidateQuery'
+        eval_pass_rate_threshold:
+          type: number
+          format: double
+        retrieval_p90_latency_ms:
+          type: integer
+          format: int64
+        optimize_timeout_seconds:
+          type: integer
+          format: int64
+        max_tool_turns:
+          type: integer
+        max_iterations:
+          type: integer
+        models:
+          type: array
+          items:
+            type: string
+    GroomInput:
+      type: object
+      title: groom
+      properties:
+        budget:
+          type: integer
+        groom_timeout_seconds:
+          type: integer
+          format: int64
+        models:
+          type: array
+          items:
+            type: string
+    TaskOutput:
+      description: 'A task''s reported `output` — heterogeneous: every workflow reports a different per-state
+        shape, stored and echoed verbatim. An unrecognized or newer shape is preserved as-is rather than
+        rejected, so treat this union as open.'
+      anyOf:
+      - $ref: '#/components/schemas/SearchTurnCompletedOutput'
+      - $ref: '#/components/schemas/SearchCcTurnCompletedOutput'
+      - $ref: '#/components/schemas/SearchTurnFailedOutput'
+      - $ref: '#/components/schemas/PackTaskOutput'
+      - $ref: '#/components/schemas/RestoreTaskOutput'
+      - $ref: '#/components/schemas/OptimizeResultOutput'
+      - $ref: '#/components/schemas/OptimizeNoopOutput'
+      - $ref: '#/components/schemas/GroomMetricsOutput'
+      - $ref: '#/components/schemas/CurateRunOutput'
+      - $ref: '#/components/schemas/CurateManifestTuneOutput'
+      - $ref: '#/components/schemas/CurateNoopOutput'
+      - $ref: '#/components/schemas/ExploreOutput'
+      - $ref: '#/components/schemas/ProfileEstimateOutput'
+      - $ref: '#/components/schemas/ProfileEmptyOutput'
+      - $ref: '#/components/schemas/ImportOutput'
+      - $ref: '#/components/schemas/StatusErrorOutput'
+      - $ref: '#/components/schemas/StateFailedOutput'
+      - type: object
+        title: Other
+        additionalProperties: true
+        description: Any shape without a named variant
+    ModelUsage:
+      type: object
+      required:
+      - tier
+      - prompt_tokens
+      - completion_tokens
+      - cache_read_tokens
+      - cache_write_tokens
+      - total_tokens
+      description: Per-model chat-seam counts; both usage roll-ups write every key.
+      properties:
+        tier:
+          type: string
+        prompt_tokens:
+          type: integer
+          format: int64
+        completion_tokens:
+          type: integer
+          format: int64
+        cache_read_tokens:
+          type: integer
+          format: int64
+        cache_write_tokens:
+          type: integer
+          format: int64
+        total_tokens:
+          type: integer
+          format: int64
+    SeamUsage:
+      type: object
+      required:
+      - kind
+      - tier
+      - embed_tokens
+      - rerank_units
+      description: 'Per-model embed/rerank-seam counts: billed per token (embed) or per request (rerank).'
+      properties:
+        kind:
+          type: string
+        tier:
+          type: string
+        embed_tokens:
+          type: integer
+          format: int64
+        rerank_units:
+          type: integer
+          format: int64
+    ChatUsage:
+      type: object
+      required:
+      - prompt_tokens
+      - completion_tokens
+      - total_tokens
+      - by_model
+      - cache_read_tokens
+      - cache_write_tokens
+      description: The chat-seam token rollup reported by the inference client, which carries the cache-token
+        fields. Used by optimize and explore.
+      properties:
+        prompt_tokens:
+          type: integer
+          format: int64
+        completion_tokens:
+          type: integer
+          format: int64
+        total_tokens:
+          type: integer
+          format: int64
+        by_model:
+          type: object
+          description: Keyed by the model the proxy actually dispatched to, so tier fallbacks are visible.
+          additionalProperties:
+            $ref: '#/components/schemas/ModelUsage'
+        cache_read_tokens:
+          type: integer
+          format: int64
+        cache_write_tokens:
+          type: integer
+          format: int64
+    CurateUsage:
+      type: object
+      required:
+      - prompt_tokens
+      - completion_tokens
+      - total_tokens
+      - by_model
+      - embed_by_model
+      description: 'Curate''s token rollup: the chat-seam totals plus the embed/rerank seam (`embed_by_model`).
+        It does not carry the cache-token fields.'
+      properties:
+        prompt_tokens:
+          type: integer
+          format: int64
+        completion_tokens:
+          type: integer
+          format: int64
+        total_tokens:
+          type: integer
+          format: int64
+        by_model:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/ModelUsage'
+        embed_by_model:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/SeamUsage'
+    SearchTurnCompletedOutput:
+      type: object
+      title: search / search_rag completed
+      required:
+      - status
+      - query_id
+      - answer
+      - output_json
+      - citations
+      - latency_ms
+      properties:
+        status:
+          type: string
+        query_id:
+          type: string
+        answer:
+          type: string
+        output_json:
+          type: object
+          nullable: true
+          additionalProperties: true
+        citations:
+          type: array
+          items:
+            type: string
+        latency_ms:
+          type: integer
+          format: int64
+    SearchCcTurnCompletedOutput:
+      type: object
+      title: search_cc completed
+      required:
+      - status
+      - query_id
+      - answer
+      - citations
+      - latency_ms
+      - steps
+      properties:
+        status:
+          type: string
+        query_id:
+          type: string
+        answer:
+          type: string
+        citations:
+          type: array
+          items:
+            type: string
+        latency_ms:
+          type: integer
+          format: int64
+        steps:
+          type: integer
+          format: int64
+    SearchTurnFailedOutput:
+      type: object
+      title: search failed
+      required:
+      - status
+      - query_id
+      - error
+      properties:
+        status:
+          type: string
+        query_id:
+          type: string
+        error:
+          type: string
+    RestoreTaskOutput:
+      type: object
+      title: restore
+      required:
+      - state
+      description: Progressive restore reports, discriminated by which fields are present.
+      properties:
+        state:
+          type: string
+        pack_filename:
+          type: string
+        pack_size:
+          type: integer
+          format: int64
+        target_context_id:
+          type: string
+        target_slug:
+          type: string
+        stage_progress:
+          type: object
+          required:
+          - phase
+          - done
+          - total
+          properties:
+            phase:
+              type: string
+            done:
+              type: integer
+              format: int64
+            total:
+              type: integer
+              format: int64
+        sources_count:
+          type: integer
+          format: int64
+        knowledge_count:
+          type: integer
+          format: int64
+        sources_staged:
+          type: integer
+          format: int64
+        knowledge_staged:
+          type: integer
+          format: int64
+        manifest_set:
+          type: boolean
+        corpus_groups_set:
+          type: integer
+          format: int64
+        started_at:
+          type: string
+        completed_at:
+          type: string
+    OptimizeNoopOutput:
+      type: object
+      title: optimize no-op
+      required:
+      - status
+      - reason
+      - candidate_queries
+      - problems
+      description: Too few candidate queries or problems to tune from.
+      properties:
+        status:
+          type: string
+        reason:
+          type: string
+        candidate_queries:
+          type: integer
+          format: int64
+        problems:
+          type: integer
+          format: int64
+    OptimizeResultOutput:
+      type: object
+      title: optimize result
+      required:
+      - status
+      - best_score
+      - best_iteration
+      - best_latency_ok
+      - total_iterations
+      - pass_rate_threshold
+      - p90_latency_limit_ms
+      - elapsed_seconds
+      - usage
+      - models
+      - manifest
+      - changed_legs
+      properties:
+        status:
+          type: string
+          description: '`ready` only when the best iteration cleared both the pass-rate and latency bars'
+        best_score:
+          type: number
+          format: double
+        best_iteration:
+          type: integer
+          format: int64
+        best_latency_ok:
+          type: boolean
+        total_iterations:
+          type: integer
+          format: int64
+        pass_rate_threshold:
+          type: number
+          format: double
+        p90_latency_limit_ms:
+          type: number
+          format: double
+          nullable: true
+        elapsed_seconds:
+          type: number
+          format: double
+        usage:
+          $ref: '#/components/schemas/ChatUsage'
+        models:
+          type: object
+          additionalProperties:
+            type: string
+          description: tier → resolved model id
+        manifest:
+          allOf:
+          - $ref: '#/components/schemas/Manifest'
+          description: The tuned manifest the orchestrator persists onto the context when the task completes.
+        changed_legs:
+          type: array
+          items:
+            type: string
+    GroomMetricsOutput:
+      type: object
+      title: groom
+      required:
+      - status
+      - budget
+      - batches_staged
+      - batches_consumed
+      - facts_distilled
+      - facts_added
+      - facts_merged
+      - facts_dropped_untyped
+      - edges_added
+      - artifacts_pruned
+      - artifact_files_written
+      - artifact_files_deleted
+      - artifact_count
+      - artifact_bytes
+      - duration_ms
+      properties:
+        status:
+          type: string
+        budget:
+          type: integer
+          format: int64
+        batches_staged:
+          type: integer
+          format: int64
+        batches_consumed:
+          type: integer
+          format: int64
+        facts_distilled:
+          type: integer
+          format: int64
+        facts_added:
+          type: integer
+          format: int64
+        facts_merged:
+          type: integer
+          format: int64
+        facts_dropped_untyped:
+          type: integer
+          format: int64
+        edges_added:
+          type: integer
+          format: int64
+        artifacts_pruned:
+          type: integer
+          format: int64
+        artifact_files_written:
+          type: integer
+          format: int64
+        artifact_files_deleted:
+          type: integer
+          format: int64
+        artifact_count:
+          type: integer
+          format: int64
+        artifact_bytes:
+          type: integer
+          format: int64
+        duration_ms:
+          type: integer
+          format: int64
+    CurateNoopOutput:
+      type: object
+      title: curate no-op
+      required:
+      - status
+      - flipped
+      - versioned
+      - mode
+      - scope
+      - delta
+      description: Nothing changed since the last run; `delta` is the literal string `empty`.
+      properties:
+        status:
+          type: string
+        flipped:
+          type: boolean
+        versioned:
+          type: boolean
+        mode:
+          type: string
+        scope:
+          type: string
+        delta:
+          type: string
+          x-enum:
+          - empty
+    CurateRunOutput:
+      type: object
+      title: curate run
+      required:
+      - status
+      - flipped
+      - versioned
+      - mode
+      - scope
+      - images_skipped_no_vision
+      - usage
+      - sample_queries
+      - delta
+      properties:
+        status:
+          type: string
+        flipped:
+          type: boolean
+        versioned:
+          type: boolean
+        mode:
+          type: string
+          description: '`incremental` when the context has a manifest, `full` otherwise'
+        scope:
+          type: string
+        images_skipped_no_vision:
+          type: integer
+          format: int64
+        usage:
+          $ref: '#/components/schemas/CurateUsage'
+        sample_queries:
+          type: array
+          items:
+            type: string
+          description: Example questions the corpus can answer
+        delta:
+          type: object
+          required:
+          - new
+          - changed
+          - deleted
+          - processed
+          - failed
+          - failed_sources
+          - failed_sources_truncated
+          - failed_sources_file
+          - corpus_artifacts
+          - corpus_edges
+          - corpus_artifacts_screened
+          - screened
+          - chunks_created
+          - chunks_updated
+          - artifacts_created
+          - artifacts_updated
+          - chunks_screened
+          - artifacts_screened
+          - images_skipped_no_vision
+          - artifacts_errored
+          - sources_content_truncated
+          properties:
+            new:
+              type: integer
+              format: int64
+            changed:
+              type: integer
+              format: int64
+            deleted:
+              type: integer
+              format: int64
+            processed:
+              type: integer
+              format: int64
+            failed:
+              type: integer
+              format: int64
+            failed_sources:
+              type: array
+              items:
+                type: string
+            failed_sources_truncated:
+              type: boolean
+              description: Whether failed_sources was capped and the full list spilled to a file
+            failed_sources_file:
+              type: string
+              description: Where the full failed-sources list was written when truncated
+            corpus_artifacts:
+              type: integer
+              format: int64
+            corpus_edges:
+              type: integer
+              format: int64
+            corpus_artifacts_screened:
+              type: integer
+              format: int64
+            screened:
+              type: integer
+              format: int64
+              description: Sum of the per-leg and corpus screen counts
+            chunks_created:
+              type: integer
+              format: int64
+            chunks_updated:
+              type: integer
+              format: int64
+            artifacts_created:
+              type: integer
+              format: int64
+            artifacts_updated:
+              type: integer
+              format: int64
+            chunks_screened:
+              type: integer
+              format: int64
+            artifacts_screened:
+              type: integer
+              format: int64
+            images_skipped_no_vision:
+              type: integer
+              format: int64
+            artifacts_errored:
+              type: integer
+              format: int64
+            sources_content_truncated:
+              type: integer
+              format: int64
+    CurateManifestTuneOutput:
+      type: object
+      title: curate manifest_tune
+      required:
+      - status
+      - flipped
+      - versioned
+      - mode
+      - usage
+      - delta
+      description: The post-optimize artifacts re-eval. Targets optimize trial namespaces, so `flipped`
+        is always false and `mode` is always `manifest_tune`.
+      properties:
+        status:
+          type: string
+        flipped:
+          type: boolean
+          x-enum:
+          - false
+        versioned:
+          type: boolean
+        mode:
+          type: string
+          x-enum:
+          - manifest_tune
+        usage:
+          $ref: '#/components/schemas/CurateUsage'
+        delta:
+          type: object
+          required:
+          - artifacts_reevaluated
+          - failed
+          - failed_sources
+          - failed_sources_truncated
+          - failed_sources_file
+          - corpus_artifacts
+          - corpus_edges
+          - chunks_created
+          - chunks_updated
+          - artifacts_created
+          - artifacts_updated
+          - chunks_screened
+          - artifacts_screened
+          - images_skipped_no_vision
+          - artifacts_errored
+          - sources_content_truncated
+          properties:
+            artifacts_reevaluated:
+              type: integer
+              format: int64
+            failed:
+              type: integer
+              format: int64
+            failed_sources:
+              type: array
+              items:
+                type: string
+            failed_sources_truncated:
+              type: boolean
+            failed_sources_file:
+              type: string
+            corpus_artifacts:
+              type: integer
+              format: int64
+            corpus_edges:
+              type: integer
+              format: int64
+            chunks_created:
+              type: integer
+              format: int64
+            chunks_updated:
+              type: integer
+              format: int64
+            artifacts_created:
+              type: integer
+              format: int64
+            artifacts_updated:
+              type: integer
+              format: int64
+            chunks_screened:
+              type: integer
+              format: int64
+            artifacts_screened:
+              type: integer
+              format: int64
+            images_skipped_no_vision:
+              type: integer
+              format: int64
+            artifacts_errored:
+              type: integer
+              format: int64
+            sources_content_truncated:
+              type: integer
+              format: int64
+    ExploreOutput:
+      type: object
+      title: explore
+      required:
+      - status
+      - matches
+      - none
+      - guide
+      - models
+      - usage
+      properties:
+        status:
+          type: string
+        matches:
+          type: array
+          description: Validated template recommendations; unknown or low-confidence proposals are dropped
+            upstream.
+          items:
+            $ref: '#/components/schemas/TemplateMatch'
+        none:
+          type: boolean
+          description: True when no template fit
+        guide:
+          type: string
+        models:
+          type: object
+          additionalProperties:
+            type: string
+          description: tier → resolved model id
+        usage:
+          $ref: '#/components/schemas/ChatUsage'
+    ProfileEmptyOutput:
+      type: object
+      title: profile empty
+      required:
+      - state
+      - reason
+      properties:
+        state:
+          type: string
+        reason:
+          type: string
+    ProfileEstimateOutput:
+      type: object
+      title: profile estimate
+      required:
+      - state
+      - g
+      - density
+      - cost
+      - sampling
+      properties:
+        state:
+          type: string
+        g:
+          type: object
+          required:
+          - value
+          - lo
+          - hi
+          - method
+          - recurrence
+          - confidence
+          - note
+          description: Estimated distinct-artifact count with its uncertainty band.
+          properties:
+            value:
+              type: integer
+              format: int64
+            lo:
+              type: integer
+              format: int64
+            hi:
+              type: integer
+              format: int64
+            method:
+              type: string
+              description: The estimator the recurrence blend selected; `empty` on the no-sample path
+            recurrence:
+              type: number
+              format: double
+            confidence:
+              type: string
+            note:
+              type: string
+        density:
+          type: object
+          required:
+          - entities_per_doc
+          - avg_doc_chars
+          description: Measured on the sampling window, not the full curate read-depth.
+          properties:
+            entities_per_doc:
+              type: number
+              format: double
+            avg_doc_chars:
+              type: integer
+              format: int64
+        cost:
+          type: object
+          required:
+          - by_tier
+          - default_tier
+          properties:
+            by_tier:
+              type: object
+              required:
+              - lite
+              - standard
+              - pro
+              properties:
+                lite:
+                  $ref: '#/components/schemas/ProfileTierCost'
+                standard:
+                  $ref: '#/components/schemas/ProfileTierCost'
+                pro:
+                  $ref: '#/components/schemas/ProfileTierCost'
+            default_tier:
+              type: string
+              description: The tier the context's current `artifact_model` resolves to
+        sampling:
+          type: object
+          required:
+          - n_total
+          - n_sampled
+          - fraction
+          - wall_s
+          description: How much of the corpus the profile actually read.
+          properties:
+            n_total:
+              type: integer
+              format: int64
+            n_sampled:
+              type: integer
+              format: int64
+            fraction:
+              type: number
+              format: double
+            wall_s:
+              type: number
+              format: double
+    ProfileTierCost:
+      type: object
+      required:
+      - tokens
+      - time_s
+      properties:
+        tokens:
+          type: object
+          required:
+          - point
+          - lo
+          - hi
+          - input
+          - output
+          description: '`point` is the estimate at G''s midpoint and splits into input/output; `lo`/`hi`
+            are band totals.'
+          properties:
+            point:
+              type: integer
+              format: int64
+            lo:
+              type: integer
+              format: int64
+            hi:
+              type: integer
+              format: int64
+            input:
+              type: integer
+              format: int64
+            output:
+              type: integer
+              format: int64
+        time_s:
+          type: object
+          required:
+          - lo
+          - hi
+          properties:
+            lo:
+              type: integer
+              format: int64
+            hi:
+              type: integer
+              format: int64
+    ImportOutput:
+      type: object
+      title: import
+      required:
+      - status
+      - imported_items
+      - output_files
+      - failed
+      - skipped
+      - skipped_items
+      - manifest_sample
+      - manifest_truncated
+      - manifest_file
+      properties:
+        status:
+          type: string
+        imported_items:
+          type: integer
+          format: int64
+        output_files:
+          type: integer
+          format: int64
+        failed:
+          type: integer
+          format: int64
+        skipped:
+          type: integer
+          format: int64
+        skipped_items:
+          type: array
+          description: Bounded sample of the skipped records
+          items:
+            $ref: '#/components/schemas/ImportManifestEntry'
+        manifest_sample:
+          type: array
+          description: Bounded sample of the records that produced output
+          items:
+            $ref: '#/components/schemas/ImportManifestEntry'
+        manifest_truncated:
+          type: boolean
+          description: Whether either sample was cut
+        manifest_file:
+          type: string
+          description: Where the full manifest was written
+        manifest_object:
+          type: string
+          description: Object-store key of the full manifest
+    ImportManifestEntry:
+      type: object
+      required:
+      - src
+      - action
+      - out
+      - fmt
+      - reason
+      - bytes
+      description: One ingest record.
+      properties:
+        src:
+          type: string
+        action:
+          type: string
+          x-enum:
+          - parsed
+          - copied
+          - extracted
+          - skipped
+          - failed
+        out:
+          type: array
+          items:
+            type: string
+          description: Empty exactly when nothing was written
+        fmt:
+          type: string
+        reason:
+          type: string
+        bytes:
+          type: integer
+          format: int64
+    StatusErrorOutput:
+      type: object
+      title: status-keyed failure
+      required:
+      - status
+      - error
+      description: The groom / curate terminal-failure convention — best-effort forensics on a task deliberately
+        left Running so the orchestrator can resume it.
+      properties:
+        status:
+          type: string
+        error:
+          type: string
+    StateFailedOutput:
+      type: object
+      title: state-keyed failure
+      required:
+      - state
+      - error
+      description: The pack / restore terminal-failure convention.
+      properties:
+        state:
+          type: string
+        error:
+          type: string
+  parameters:
+    ApiVersionHeader:
+      in: header
+      name: X-Pinecone-API-Version
+      description: Date-based contract version. Omit to resolve to the oldest served version (`2026-07`);
+        send `unstable` for the in-development surface. The resolved version is echoed back on the same
+        header. A present-but-unrecognized value is rejected with `400 unsupported_api_version`.
+      required: false
+      style: simple
+      schema:
+        type: string
+        default: 2026-07
+        x-enum:
+        - 2026-07
+        - unstable
+    ContextSlug:
+      name: slug
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Context slug or UUID.
+    TaskId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Task id.
+    FilePath:
+      name: path
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Relative path within the tree. Matches greedily, so it may contain `/`.
+    Offset:
+      name: offset
+      in: query
+      required: false
+      schema:
+        type: integer
+        format: int64
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        format: int64
+    ContextKindFilter:
+      name: kind
+      in: query
+      required: false
+      schema:
+        $ref: '#/components/schemas/ContextKind'
+      description: Filter to providers valid for this context kind.
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Missing or invalid credential
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: 'Not permitted. Coded cases: `preview_not_enabled` (project not enabled for the Nexus
+        preview), `workspace_host_required` (reached over the account host on a workspace-enabled cluster).'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 'Session token from POST /auth/login. Pass as `Authorization: Bearer <token>`. The
+        alternative `X-Pinecone-Api-Key` header is also accepted for direct-key auth (used by the Nexus
+        CLI on first contact).'
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-Pinecone-Api-Key
+      description: Pinecone API key, accepted as an alternative to the bearer JWT.
