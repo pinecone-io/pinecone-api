@@ -2668,22 +2668,6 @@ components:
         version:
           type: integer
           format: int64
-    ChunkReclaim:
-      type: object
-      required:
-      - source
-      - removed_version
-      - chunk_ids
-      properties:
-        source:
-          type: string
-        removed_version:
-          type: integer
-          format: int64
-        chunk_ids:
-          type: array
-          items:
-            type: string
     SourceRemoved:
       type: object
       required:
@@ -2703,13 +2687,11 @@ components:
       - manifest
       - edges
       - corpus_groups
-      - chunk_ids
       - live_version
       - versions_stamped
       - source_removed
       - redispatch_count
       - artifact_reclaim
-      - chunk_reclaim
       - source_pointers
       - source_glossary
       properties:
@@ -2728,13 +2710,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CorpusGroup'
-        chunk_ids:
-          type: object
-          description: Chunk-id lineage, keyed by source path.
-          additionalProperties:
-            type: array
-            items:
-              type: string
         live_version:
           type: integer
           format: int64
@@ -2750,10 +2725,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ArtifactReclaim'
-        chunk_reclaim:
-          type: array
-          items:
-            $ref: '#/components/schemas/ChunkReclaim'
         source_pointers:
           type: object
           additionalProperties:
