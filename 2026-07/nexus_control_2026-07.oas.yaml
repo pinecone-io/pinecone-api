@@ -1,0 +1,641 @@
+openapi: 3.0.3
+info:
+  title: Pinecone Nexus Control Plane API
+  description: Control-plane API for Pinecone Nexus.
+  contact:
+    name: Pinecone Support
+    url: https://support.pinecone.io
+    email: support@pinecone.io
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+  version: 2026-07
+servers:
+- url: https://api.pinecone.io
+  description: Production API endpoints
+paths:
+  /workspaces:
+    get:
+      tags:
+      - Manage Workspaces
+      summary: List workspaces
+      description: List the workspaces in the project. Results are paginated; the `pagination` object is omitted when there are no further results.
+      operationId: list_workspaces
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2026-07
+          type: string
+        style: simple
+      - in: query
+        name: limit
+        description: The number of results to return per page.
+        schema:
+          default: 10
+          type: integer
+          minimum: 1
+          maximum: 100
+        style: form
+      - in: query
+        name: paginationToken
+        description: The token to use to retrieve the next page of results.
+        schema:
+          type: string
+        style: form
+      responses:
+        '200':
+          description: This operation returns a list of all the workspaces that you have previously created, and which are associated with the given project.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceList'
+              examples:
+                multiple-workspaces:
+                  summary: A list containing two workspaces.
+                  value:
+                    pagination:
+                      next: dXNlcl9pZD11c2VyXzE=
+                    workspaces:
+                    - created_at: 2026-06-01T00:00:00Z
+                      host: production-c01b5b5.wksp.aws-us-east-1-b921.byoc.pinecone.io
+                      name: production
+                      spec:
+                        byoc:
+                          environment: aws-us-east-1-b921.byoc
+                      status:
+                        ready: true
+                        state: Ready
+                      updated_at: 2026-06-11T13:00:00Z
+                    - created_at: 2026-06-10T00:00:00Z
+                      host: staging-7a1f9c1.wksp.aws-us-east-1-b921.byoc.pinecone.io
+                      name: staging
+                      spec:
+                        byoc:
+                          environment: aws-us-east-1-b921.byoc
+                      status:
+                        ready: true
+                        state: Ready
+                      updated_at: 2026-06-11T13:00:00Z
+                no-workspaces:
+                  summary: No workspaces created yet.
+                  value:
+                    workspaces: []
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+    post:
+      tags:
+      - Manage Workspaces
+      summary: Create a workspace
+      description: |
+        Create a Nexus workspace. The workspace name must be unique within the project.
+
+        Workspaces are created asynchronously. On success the workspace is returned in the `Initializing` state with `ready` set to `false`. Poll [Describe workspace](#operation/describe_workspace) until the workspace reaches the `Ready` state before using it.
+      operationId: create_workspace
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2026-07
+          type: string
+        style: simple
+      requestBody:
+        description: The desired configuration for the workspace.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWorkspaceRequest'
+            examples:
+              byoc-workspace:
+                summary: Creating a workspace in a BYOC environment
+                value:
+                  name: production
+                  spec:
+                    byoc:
+                      environment: aws-us-east-1-b921.byoc
+        required: true
+      responses:
+        '201':
+          description: The workspace create request has been accepted. The workspace is being provisioned asynchronously and starts in the `Initializing` state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceModel'
+              examples:
+                initializing-workspace:
+                  summary: A workspace that is being created
+                  value:
+                    created_at: 2026-06-01T00:00:00Z
+                    host: production-c01b5b5.wksp.aws-us-east-1-b921.byoc.pinecone.io
+                    name: production
+                    spec:
+                      byoc:
+                        environment: aws-us-east-1-b921.byoc
+                    status:
+                      ready: false
+                      state: Initializing
+                    updated_at: 2026-06-01T00:00:00Z
+        '400':
+          description: Bad request. The request body included invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid-name:
+                  summary: Validation error
+                  value:
+                    error:
+                      code: INVALID_ARGUMENT
+                      message: Workspace name must be 1-45 characters, contain only lowercase alphanumeric characters or '-', and start and end with an alphanumeric character.
+                    status: 400
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '403':
+          description: Forbidden. The API key does not have permission to perform this action, or a project limit (such as the maximum number of workspaces) has been reached.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                quota-exceeded:
+                  summary: Workspace quota exceeded
+                  value:
+                    error:
+                      code: FORBIDDEN
+                      message: This project has reached its workspace limit. Delete an existing workspace or contact support to raise the limit.
+                    status: 403
+                permission-denied:
+                  summary: Insufficient permissions
+                  value:
+                    error:
+                      code: FORBIDDEN
+                      message: The API key does not have permission to perform this action.
+                    status: 403
+        '409':
+          description: Workspace of given name already exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                workspace-name-already-exists:
+                  summary: Workspace name needs to be unique
+                  value:
+                    error:
+                      code: ALREADY_EXISTS
+                      message: A workspace named 'production' already exists in this project. Choose a different name.
+                    status: 409
+        '422':
+          description: Unprocessable entity. The request body could not be deserialized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missing-field:
+                  summary: Unprocessable entity
+                  value:
+                    error:
+                      code: UNPROCESSABLE_ENTITY
+                      message: 'Failed to deserialize the JSON body into the target type: missing field `spec` at line 1 column 20'
+                    status: 422
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+  /workspaces/{workspace_name}:
+    get:
+      tags:
+      - Manage Workspaces
+      summary: Describe a workspace
+      description: Get a description of a workspace.
+      operationId: describe_workspace
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2026-07
+          type: string
+        style: simple
+      - in: path
+        name: workspace_name
+        description: The name of the workspace to be described.
+        required: true
+        schema:
+          example: example-workspace
+          description: |
+            The name of the workspace. Resource name must be 1-45 characters long, start and end with an alphanumeric character, and consist only of lower case alphanumeric characters or '-'.
+          type: string
+          minLength: 1
+          maxLength: 45
+        example: production
+        style: simple
+      responses:
+        '200':
+          description: Configuration information and status of the workspace.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceModel'
+              examples:
+                workspace:
+                  summary: A workspace
+                  value:
+                    created_at: 2026-06-01T00:00:00Z
+                    host: production-c01b5b5.wksp.aws-us-east-1-b921.byoc.pinecone.io
+                    name: production
+                    spec:
+                      byoc:
+                        environment: aws-us-east-1-b921.byoc
+                    status:
+                      ready: true
+                      state: Ready
+                    updated_at: 2026-06-01T00:00:00Z
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '404':
+          description: Workspace not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                workspace-not-found:
+                  summary: Workspace not found
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Workspace example-workspace not found.
+                    status: 404
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+    delete:
+      tags:
+      - Manage Workspaces
+      summary: Delete a workspace
+      description: |
+        Delete an existing workspace. Deletion is asynchronous: the workspace transitions to the `Terminating` state and its contexts are deleted, after which the workspace itself is removed.
+      operationId: delete_workspace
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2026-07
+          type: string
+        style: simple
+      - in: path
+        name: workspace_name
+        description: The name of the workspace to delete.
+        required: true
+        schema:
+          example: example-workspace
+          description: |
+            The name of the workspace. Resource name must be 1-45 characters long, start and end with an alphanumeric character, and consist only of lower case alphanumeric characters or '-'.
+          type: string
+          minLength: 1
+          maxLength: 45
+        example: production
+        style: simple
+      responses:
+        '202':
+          description: The request to delete the workspace has been accepted.
+        '401':
+          description: 'Unauthorized. Possible causes: Invalid API key.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Unauthorized
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Invalid API key.
+                    status: 401
+        '403':
+          description: Forbidden. The API key does not have permission to perform this action, or a project limit (such as the maximum number of workspaces) has been reached.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                quota-exceeded:
+                  summary: Workspace quota exceeded
+                  value:
+                    error:
+                      code: FORBIDDEN
+                      message: This project has reached its workspace limit. Delete an existing workspace or contact support to raise the limit.
+                    status: 403
+                permission-denied:
+                  summary: Insufficient permissions
+                  value:
+                    error:
+                      code: FORBIDDEN
+                      message: The API key does not have permission to perform this action.
+                    status: 403
+        '404':
+          description: Workspace not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                workspace-not-found:
+                  summary: Workspace not found
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Workspace example-workspace not found.
+                    status: 404
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internal-server-error:
+                  summary: Internal server error
+                  value:
+                    error:
+                      code: UNKNOWN
+                      message: Internal server error
+                    status: 500
+components:
+  schemas:
+    CreateWorkspaceRequest:
+      description: The configuration needed to create a workspace.
+      type: object
+      properties:
+        name:
+          example: example-workspace
+          description: |
+            The name of the workspace. Resource name must be 1-45 characters long, start and end with an alphanumeric character, and consist only of lower case alphanumeric characters or '-'.
+          type: string
+          minLength: 1
+          maxLength: 45
+        spec:
+          $ref: '#/components/schemas/WorkspaceSpec'
+      required:
+      - name
+      - spec
+    ErrorResponse:
+      example:
+        error:
+          code: QUOTA_EXCEEDED
+          message: The request exceeds your project quota. Upgrade your account or adjust your project settings to increase the quota.
+        status: 429
+      description: The response shape used for all error responses.
+      type: object
+      properties:
+        status:
+          example: 500
+          description: The HTTP status code of the error.
+          type: integer
+        error:
+          example:
+            code: INVALID_ARGUMENT
+            message: The request contained an invalid argument.
+          description: Detailed information about the error that occurred.
+          type: object
+          properties:
+            code:
+              description: |-
+                The code of the error.
+                Possible values: `OK`, `UNKNOWN`, `INVALID_ARGUMENT`, `DEADLINE_EXCEEDED`, `QUOTA_EXCEEDED`, `NOT_FOUND`, `ALREADY_EXISTS`, `PERMISSION_DENIED`, `UNAUTHENTICATED`, `RESOURCE_EXHAUSTED`, `FAILED_PRECONDITION`, `ABORTED`, `OUT_OF_RANGE`, `UNIMPLEMENTED`, `INTERNAL`, `UNAVAILABLE`, `DATA_LOSS`, `FORBIDDEN`, `UNPROCESSABLE_ENTITY`, or `PAYMENT_REQUIRED`.
+              x-enum:
+              - OK
+              - UNKNOWN
+              - INVALID_ARGUMENT
+              - DEADLINE_EXCEEDED
+              - QUOTA_EXCEEDED
+              - NOT_FOUND
+              - ALREADY_EXISTS
+              - PERMISSION_DENIED
+              - UNAUTHENTICATED
+              - RESOURCE_EXHAUSTED
+              - FAILED_PRECONDITION
+              - ABORTED
+              - OUT_OF_RANGE
+              - UNIMPLEMENTED
+              - INTERNAL
+              - UNAVAILABLE
+              - DATA_LOSS
+              - FORBIDDEN
+              - UNPROCESSABLE_ENTITY
+              - PAYMENT_REQUIRED
+              type: string
+            message:
+              example: The request contained an invalid argument.
+              description: A human-readable description of the error
+              type: string
+            details:
+              description: Additional information about the error. This field is not guaranteed to be present.
+              type: object
+          required:
+          - code
+          - message
+      required:
+      - status
+      - error
+    PaginationResponse:
+      example:
+        next: dXNlcl9pZD11c2VyXzE=
+      description: Pagination information. Present only when more results are available; absent on the final page.
+      type: object
+      properties:
+        next:
+          example: dXNlcl9pZD11c2VyXzE=
+          description: The token to use to retrieve the next page of results.
+          type: string
+      required:
+      - next
+    WorkspaceByocSpec:
+      example:
+        environment: aws-us-east-1-b921.byoc
+      title: BYOC
+      description: Configuration needed to create a workspace in a BYOC (Bring Your Own Cloud) environment.
+      type: object
+      properties:
+        environment:
+          example: aws-us-east-1-b921.byoc
+          description: The BYOC environment where the workspace's contexts are hosted.
+          type: string
+      required:
+      - environment
+    WorkspaceList:
+      description: The list of workspaces that exist in the project.
+      type: object
+      properties:
+        workspaces:
+          description: List of workspaces in the project
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkspaceModel'
+        pagination:
+          $ref: '#/components/schemas/PaginationResponse'
+      required:
+      - workspaces
+    WorkspaceModel:
+      description: Describes a workspace, a project-scoped grouping of contexts.
+      type: object
+      properties:
+        name:
+          example: example-workspace
+          description: |
+            The name of the workspace. Resource name must be 1-45 characters long, start and end with an alphanumeric character, and consist only of lower case alphanumeric characters or '-'.
+          type: string
+          minLength: 1
+          maxLength: 45
+        spec:
+          $ref: '#/components/schemas/WorkspaceSpec'
+        host:
+          example: production-c01b5b5.wksp.prod.pinecone.io
+          description: The URL address where the workspace is hosted.
+          type: string
+        created_at:
+          example: 2026-06-21T00:00:00Z
+          description: The date and time the workspace was created.
+          type: string
+          format: date-time
+        updated_at:
+          example: 2026-06-21T00:00:00Z
+          description: The date and time the workspace was last updated.
+          type: string
+          format: date-time
+        status:
+          example:
+            ready: true
+            state: Ready
+          description: The current status of the workspace.
+          type: object
+          properties:
+            ready:
+              description: Whether the workspace is ready for use.
+              type: boolean
+            state:
+              description: |-
+                The state of the workspace.
+                Possible values: `Initializing`, `InitializationFailed`, `Ready`, or `Terminating`.
+              x-enum:
+              - Initializing
+              - InitializationFailed
+              - Ready
+              - Terminating
+              type: string
+          required:
+          - ready
+          - state
+      required:
+      - name
+      - spec
+      - host
+      - status
+      - created_at
+      - updated_at
+    WorkspaceSpec:
+      description: |
+        The spec object defines the environment in which the workspace's contexts are created. Workspaces are created in a customer-managed BYOC (Bring Your Own Cloud) environment.
+      type: object
+      properties:
+        byoc:
+          $ref: '#/components/schemas/WorkspaceByocSpec'
+      required:
+      - byoc
+      additionalProperties: false
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: Api-Key
+      description: An API Key is required to call Pinecone APIs. Get yours from the [console](https://app.pinecone.io/).
+security:
+- ApiKeyAuth: []
+tags:
+- name: Manage Workspaces
+  description: Actions that manage Nexus workspaces
+externalDocs:
+  description: More Pinecone.io API docs
+  url: https://docs.pinecone.io/introduction
