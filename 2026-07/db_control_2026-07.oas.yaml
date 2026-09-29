@@ -3762,6 +3762,7 @@ components:
           minProperties: 1
       required:
       - fields
+      additionalProperties: false
     CreateIndexSchemaField:
       description: |-
         The configuration of a single field in the index schema at creation time. The `type` property determines how the field is stored and searched.
@@ -3839,6 +3840,7 @@ components:
       - type
       - dimension
       - metric
+      additionalProperties: false
     ErrorResponse:
       example:
         error:
@@ -4785,6 +4787,7 @@ components:
           maxLength: 256
       required:
       - type
+      additionalProperties: false
     StringField:
       example:
         full_text_search:

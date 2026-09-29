@@ -425,7 +425,7 @@ paths:
                 ids: $request.body#/ids/0
                 namespace: $request.body#/namespace
         '400':
-          description: Bad request. The request body included invalid request parameters.
+          description: 'Bad request. Possible causes: invalid request parameters, or the request addressed a namespace alias (reason `WRITE_TO_ALIAS`). Writes must address a namespace directly.'
           content:
             application/json:
               schema:
@@ -718,7 +718,7 @@ paths:
                 ids: $request.body#/id
                 namespace: $request.body#/namespace
         '400':
-          description: Bad request. The request body included invalid request parameters.
+          description: 'Bad request. Possible causes: invalid request parameters, or the request addressed a namespace alias (reason `WRITE_TO_ALIAS`). Writes must address a namespace directly.'
           content:
             application/json:
               schema:
@@ -801,6 +801,12 @@ paths:
             text/plain:
               schema:
                 $ref: '#/components/schemas/UnauthorizedMessage'
+        '409':
+          description: The upsert addressed a namespace that does not exist, and the namespace could not be created because its name is in use by a namespace alias (reason `NAME_IN_USE_BY_ALIAS`). Writes cannot address an alias. Write to the alias's target namespace directly.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rpcStatus'
         4XX:
           description: An unexpected error response.
           content:
@@ -942,7 +948,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/UnauthorizedMessage'
         '409':
-          description: Namespace of the given name already exists on the index.
+          description: Namespace of the given name already exists on the index, or the name is in use by a namespace alias (reason `NAME_IN_USE_BY_ALIAS`).
           content:
             application/json:
               schema:
@@ -998,7 +1004,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/NamespaceDescription'
         '400':
-          description: Bad request. The request body included invalid request parameters.
+          description: 'Bad request. Possible causes: invalid request parameters, or the name belongs to a namespace alias rather than a namespace (reason `NAMESPACE_OPERATION_ON_ALIAS`). Aliases are described via `GET /namespace-aliases/{alias_name}`.'
           content:
             application/json:
               schema:
@@ -1071,7 +1077,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/DeleteResponse'
         '400':
-          description: Bad request. The request body included invalid request parameters.
+          description: 'Bad request. Possible causes: invalid request parameters, the name belongs to a namespace alias rather than a namespace (reason `NAMESPACE_OPERATION_ON_ALIAS`), or the namespace is the target of one or more aliases (reason `NAMESPACE_TARGETED_BY_ALIAS`) and can only be deleted after every alias pointing at it is repointed or deleted.'
           content:
             application/json:
               schema:
@@ -1100,6 +1106,360 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/rpcStatus'
+  /namespace-aliases:
+    get:
+      tags:
+      - Namespace Alias Operations
+      summary: List namespace aliases
+      description: |-
+        List the namespace aliases in a serverless index, ordered by name. Filter by name prefix or by target namespace.
+
+        Up to 100 aliases are returned per page; set `limit` to return fewer. When more remain, the response includes `pagination.next`; pass it as `paginationToken` to get the next page.
+
+        For guidance and examples, see [Manage namespace aliases](https://docs.pinecone.io/guides/manage-data/namespace-aliases/manage-aliases).
+      operationId: listNamespaceAliases
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2026-07
+          type: string
+        style: simple
+      - in: query
+        name: limit
+        description: Max number of aliases to return per page. Defaults to 100.
+        schema:
+          default: 100
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 100
+        example: 10
+        style: form
+      - in: query
+        name: paginationToken
+        description: Pagination token to continue a previous listing operation. Filters are carried by the token; if they are repeated in the request, they must match.
+        schema:
+          type: string
+        style: form
+      - in: query
+        name: prefix
+        description: Prefix of the aliases to list. Acts as a filter to return only aliases whose name starts with this prefix.
+        schema:
+          type: string
+          pattern: ^[\x01-\x7F]*$
+          maxLength: 512
+        example: dataset
+        style: form
+      - in: query
+        name: target_namespace
+        description: Return only aliases that resolve to this namespace. Use `__default__` for the default namespace. Aliases cannot be targets, so an alias name here matches nothing. Combines with `prefix`.
+        schema:
+          type: string
+          pattern: ^[\x01-\x7F]+$
+          minLength: 1
+          maxLength: 512
+        example: dataset_v1
+        style: form
+      responses:
+        '200':
+          description: A successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListNamespaceAliasesResponse'
+        '400':
+          description: 'Bad request. The `reason` field of the error''s `details` entry identifies the cause: `LIST_INVALID_LIMIT` (`limit` is out of range), `INVALID_PAGINATION_TOKEN` (the pagination token is malformed or from another endpoint), `LIST_INVALID_TOKEN_WITH_PREFIX` or `LIST_INVALID_TOKEN_WITH_TARGET` (a repeated filter disagrees with the token), `LIST_INVALID_TOKEN_WITH_NEW_PREFIX` or `LIST_INVALID_TOKEN_WITH_NEW_TARGET` (a filter was added mid-listing), `TARGET_FILTER_EMPTY` (`target_namespace` is present but empty), `PREFIX_TOO_LONG`, `PREFIX_MUST_BE_ASCII`, or `PREFIX_MUST_NOT_CONTAIN_NULL_CHARACTER` (the `prefix` is invalid), or `API_VERSION_TOO_OLD` (the API version is too old). An unknown query parameter is also rejected.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rpcStatus'
+        '401':
+          description: 'Unauthorized. Possible causes: missing or invalid API key.'
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedMessage'
+        4XX:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rpcStatus'
+        5XX:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rpcStatus'
+    post:
+      tags:
+      - Namespace Alias Operations
+      summary: Create a namespace alias
+      description: |-
+        Create an alias that resolves to an existing namespace in the index. Reads
+        through the alias are served from its target namespace; writes to an alias
+        name are rejected. Many aliases can resolve to the same namespace.
+
+        The call returns once the alias resolves on every reader, which takes about
+        a second; size client timeouts accordingly. A 409 whose
+        `details.metadata.target_namespace` matches the requested target carries
+        the same guarantee: your earlier call committed and the alias is live.
+
+        For guidance and examples, see [Manage namespace aliases](https://docs.pinecone.io/guides/manage-data/namespace-aliases/manage-aliases).
+      operationId: createNamespaceAlias
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2026-07
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateNamespaceAliasRequest'
+        required: true
+      responses:
+        '200':
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NamespaceAliasDescription'
+        '400':
+          description: 'Bad request. The `reason` field of the error''s `details` entry identifies the cause: `ALIAS_NAME_INVALID` (the alias name is invalid), `TARGET_NAMESPACE_REQUIRED` (`target_namespace` is missing or empty), `NAMESPACE_TOO_LONG` or `NAMESPACE_INVALID` (the target is not a possible namespace name), `TARGET_NAMESPACE_NOT_FOUND` (the target namespace does not exist), `TARGET_NAMESPACE_NOT_ACTIVE` (the target namespace is not active yet; the same request succeeds once it is), `TARGET_IS_ALIAS` (the target is itself an alias), `ALIASES_PER_INDEX_EXCEEDED` (the index has reached its alias limit), or `API_VERSION_TOO_OLD` (the API version is too old).'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rpcStatus'
+        '401':
+          description: 'Unauthorized. Possible causes: missing or invalid API key.'
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedMessage'
+        '409':
+          description: 'Conflict. The `reason` field of the error''s `details` entry identifies the cause: `ALIAS_ALREADY_EXISTS` (an alias with this name already exists; the `details` entry''s `metadata.target_namespace` names its current target) or `NAME_IN_USE_BY_NAMESPACE` (the name is held by a namespace).'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rpcStatus'
+        4XX:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rpcStatus'
+        5XX:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rpcStatus'
+  /namespace-aliases/{alias_name}:
+    get:
+      tags:
+      - Namespace Alias Operations
+      summary: Describe a namespace alias
+      description: |-
+        Get an alias and the namespace it resolves to.
+
+        For guidance and examples, see [Manage namespace aliases](https://docs.pinecone.io/guides/manage-data/namespace-aliases/manage-aliases).
+      operationId: describeNamespaceAlias
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2026-07
+          type: string
+        style: simple
+      responses:
+        '200':
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NamespaceAliasDescription'
+        '400':
+          description: 'Bad request. The `reason` field of the error''s `details` entry identifies the cause: `ALIAS_NAME_INVALID` (the alias name is invalid) or `API_VERSION_TOO_OLD` (the API version is too old).'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rpcStatus'
+        '401':
+          description: 'Unauthorized. Possible causes: missing or invalid API key.'
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedMessage'
+        '404':
+          description: Not found. No alias with this name exists in the index.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rpcStatus'
+        4XX:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rpcStatus'
+        5XX:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rpcStatus'
+    delete:
+      tags:
+      - Namespace Alias Operations
+      summary: Delete a namespace alias
+      description: |-
+        Remove an alias. The target namespace and its data are unchanged. Reads
+        that still use the alias name are treated as reads of a nonexistent
+        namespace (empty results, not an error), so migrate readers off the alias
+        first.
+
+        The call returns once no reader still resolves the alias, which takes about
+        a second; size client timeouts accordingly. A retried delete that returns
+        404 means the alias is already gone and carries the same guarantee.
+
+        For guidance and examples, see [Manage namespace aliases](https://docs.pinecone.io/guides/manage-data/namespace-aliases/manage-aliases).
+      operationId: deleteNamespaceAlias
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2026-07
+          type: string
+        style: simple
+      responses:
+        '200':
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteResponse'
+        '400':
+          description: 'Bad request. The `reason` field of the error''s `details` entry identifies the cause: `ALIAS_NAME_INVALID` (the alias name is invalid) or `API_VERSION_TOO_OLD` (the API version is too old).'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rpcStatus'
+        '401':
+          description: 'Unauthorized. Possible causes: missing or invalid API key.'
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedMessage'
+        '404':
+          description: Not found. No alias with this name exists in the index. For a retried delete this means the alias is already gone.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rpcStatus'
+        4XX:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rpcStatus'
+        5XX:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rpcStatus'
+    patch:
+      tags:
+      - Namespace Alias Operations
+      summary: Repoint a namespace alias
+      description: |-
+        Update the namespace an alias resolves to. The change is atomic: the target
+        is validated in the same transaction that rewrites the alias, and on
+        failure the alias keeps its current target.
+
+        The call returns once the new target is live on every reader, which takes
+        about a second; size client timeouts accordingly. Reads through the alias
+        that start after the response are served from the new namespace, so no
+        polling is needed. Repointing is safe to retry; `updated_at` advances on
+        every attempt.
+
+        For guidance and examples, see [Manage namespace aliases](https://docs.pinecone.io/guides/manage-data/namespace-aliases/manage-aliases).
+      operationId: repointNamespaceAlias
+      parameters:
+      - in: header
+        name: X-Pinecone-Api-Version
+        description: Required date-based version header
+        required: true
+        schema:
+          default: 2026-07
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RepointNamespaceAliasRequest'
+        required: true
+      responses:
+        '200':
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NamespaceAliasDescription'
+        '400':
+          description: 'Bad request. The `reason` field of the error''s `details` entry identifies the cause: `ALIAS_NAME_INVALID` (the alias name is invalid), `TARGET_NAMESPACE_REQUIRED` (`target_namespace` is missing or empty), `NAMESPACE_TOO_LONG` or `NAMESPACE_INVALID` (the target is not a possible namespace name), `TARGET_NAMESPACE_NOT_FOUND` (the target namespace does not exist), `TARGET_NAMESPACE_NOT_ACTIVE` (the target namespace is not active yet; the same request succeeds once it is), `TARGET_IS_ALIAS` (the target is itself an alias), or `API_VERSION_TOO_OLD` (the API version is too old).'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rpcStatus'
+        '401':
+          description: 'Unauthorized. Possible causes: missing or invalid API key.'
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedMessage'
+        '404':
+          description: Not found. No alias with this name exists in the index.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rpcStatus'
+        4XX:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rpcStatus'
+        5XX:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rpcStatus'
+    parameters:
+    - in: path
+      name: alias_name
+      description: 'The name of the alias. Must be 1-512 characters of printable ASCII, excluding space and `/ ? # % & = \ ; +`.'
+      required: true
+      schema:
+        type: string
+        pattern: ^[\x21\x22\x24\x27-\x2A\x2C-\x2E\x30-\x3A\x3C\x3E\x40-\x5B\x5D-\x7E]+$
+        minLength: 1
+        maxLength: 512
+      style: simple
   /records/namespaces/{namespace}/upsert:
     post:
       tags:
@@ -1155,6 +1515,12 @@ paths:
             text/plain:
               schema:
                 $ref: '#/components/schemas/UnauthorizedMessage'
+        '409':
+          description: The namespace does not exist and could not be created because its name is in use by a namespace alias. Writes cannot address an alias. Write to the alias's target namespace directly.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         4XX:
           description: An unexpected error response.
           content:
@@ -1297,6 +1663,12 @@ paths:
             text/plain:
               schema:
                 $ref: '#/components/schemas/UnauthorizedMessage'
+        '409':
+          description: The namespace does not exist and could not be created because its name is in use by a namespace alias. Writes cannot address an alias. Write to the alias's target namespace directly.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         4XX:
           description: An unexpected error response.
           content:
@@ -1455,6 +1827,7 @@ paths:
                         title: Introduction to Machine Learning
                     namespace: my-namespace
                     usage:
+                      egress_bytes: 1024
                       read_units: 5
                 by_filter_mid_page:
                   summary: A page of filter matches with more results to follow
@@ -1467,6 +1840,7 @@ paths:
                     pagination:
                       next: Tm90aGluZyB0byBzZWUgaGVyZQo=
                     usage:
+                      egress_bytes: 1024
                       read_units: 5
                 by_filter_last_page:
                   summary: The final page of filter matches, with no `pagination` token to follow
@@ -1477,6 +1851,7 @@ paths:
                         title: Neural Networks in Practice
                     namespace: my-namespace
                     usage:
+                      egress_bytes: 1024
                       read_units: 5
         '400':
           description: Bad request. The request body included invalid request parameters.
@@ -1580,6 +1955,12 @@ paths:
             text/plain:
               schema:
                 $ref: '#/components/schemas/UnauthorizedMessage'
+        '412':
+          description: The request addressed a namespace alias, which cannot be written through. Write to the alias's target namespace directly.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         4XX:
           description: An unexpected error response.
           content:
@@ -1674,6 +2055,12 @@ paths:
             text/plain:
               schema:
                 $ref: '#/components/schemas/UnauthorizedMessage'
+        '412':
+          description: The request addressed a namespace alias, which cannot be written through. Write to the alias's target namespace directly.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         4XX:
           description: An unexpected error response.
           content:
@@ -1736,6 +2123,7 @@ paths:
                     pagination:
                       next: Tm90aGluZyB0byBzZWUgaGVyZQo=
                     usage:
+                      egress_bytes: 1024
                       read_units: 1
                 last_page:
                   summary: The final page with no further results
@@ -1744,6 +2132,7 @@ paths:
                     - _id: doc-3
                     namespace: my-namespace
                     usage:
+                      egress_bytes: 1024
                       read_units: 1
           links:
             FetchListedDocument:
@@ -2018,6 +2407,7 @@ components:
       example:
         namespace: example-namespace
         usage:
+          egressBytes: 1024
           readUnits: 1
         vectors:
           id-1:
@@ -2040,7 +2430,7 @@ components:
             $ref: '#/components/schemas/Vector'
         namespace:
           example: example-namespace
-          description: The namespace of the vectors.
+          description: 'The namespace that served the fetch: the request''s namespace, or the alias''s target namespace when the request named a namespace alias.'
           type: string
         usage:
           $ref: '#/components/schemas/Usage'
@@ -2066,7 +2456,7 @@ components:
           $ref: '#/components/schemas/Pagination'
         namespace:
           example: example-namespace
-          description: The namespace of the vectors.
+          description: 'The namespace that served the list: the request''s namespace, or the alias''s target namespace when the request named a namespace alias.'
           type: string
         usage:
           $ref: '#/components/schemas/Usage'
@@ -2117,6 +2507,7 @@ components:
             fields:
               description: |-
                 A map of metadata field names to their configuration. The field name must be a valid metadata field name. The field name must be unique. At most 50 fields may be declared.
+
                 Field names may not begin with `$`, which introduces a filter operator. When declared at index creation, names beginning with `_` are also rejected (reserved for internal use).
               type: object
               additionalProperties:
@@ -2161,6 +2552,7 @@ components:
             fields:
               description: |-
                 A map of metadata field names to their configuration. The field name must be a valid metadata field name. The field name must be unique. At most 50 fields may be declared.
+
                 Field names may not begin with `$`, which introduces a filter operator. When declared at index creation, names beginning with `_` are also rejected (reserved for internal use).
               type: object
               additionalProperties:
@@ -2206,6 +2598,84 @@ components:
           description: The total number of namespaces in the index matching the prefix
           type: integer
           format: int32
+    CreateNamespaceAliasRequest:
+      description: A request for creating a namespace alias.
+      type: object
+      properties:
+        name:
+          example: dataset
+          description: 'The name of the alias to create. Must be 1-512 characters of printable ASCII, excluding space and `/ ? # % & = \ ; +`, and cannot be `__default__`, `.` or `..`. It shares one uniqueness space with namespace names: it cannot be the name of an existing namespace or alias, and no namespace can later be created under it.'
+          type: string
+          pattern: ^[\x21\x22\x24\x27-\x2A\x2C-\x2E\x30-\x3A\x3C\x3E\x40-\x5B\x5D-\x7E]+$
+          minLength: 1
+          maxLength: 512
+        target_namespace:
+          example: dataset_v1
+          description: The namespace the alias resolves to. Must be an existing, active namespace in the index; an alias cannot point to another alias. To point the alias at the default namespace, use `__default__`.
+          type: string
+          pattern: ^[\x01-\x7F]+$
+          minLength: 1
+          maxLength: 512
+      required:
+      - name
+      - target_namespace
+    RepointNamespaceAliasRequest:
+      description: A request for repointing a namespace alias at a different namespace.
+      type: object
+      properties:
+        target_namespace:
+          example: dataset_v2
+          description: The namespace the alias resolves to after the repoint. Must be an existing, active namespace in the index; an alias cannot point to another alias. To point the alias at the default namespace, use `__default__`.
+          type: string
+          pattern: ^[\x01-\x7F]+$
+          minLength: 1
+          maxLength: 512
+      required:
+      - target_namespace
+    NamespaceAliasDescription:
+      description: A description of a namespace alias and the namespace it resolves to.
+      type: object
+      properties:
+        name:
+          example: dataset
+          description: The name of the alias. Immutable after creation.
+          type: string
+        target_namespace:
+          example: dataset_v1
+          description: The namespace the alias resolves to. Changed only by repointing the alias. The default namespace is represented as `__default__`.
+          type: string
+        created_at:
+          example: 2026-09-01T12:00:00Z
+          description: The time the alias was created.
+          type: string
+          format: date-time
+        updated_at:
+          example: 2026-09-01T12:00:00Z
+          description: The time the alias was last repointed. Advances on every repoint, including a repoint to the alias's current target; equals `created_at` until the first repoint.
+          type: string
+          format: date-time
+      required:
+      - name
+      - target_namespace
+      - created_at
+      - updated_at
+    ListNamespaceAliasesResponse:
+      type: object
+      properties:
+        namespace_aliases:
+          description: The aliases in this index that match the request, ordered by name.
+          type: array
+          items:
+            $ref: '#/components/schemas/NamespaceAliasDescription'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+        total_count:
+          example: 3
+          description: The total number of aliases in the index matching the request filters. May change between pages under concurrent modifications.
+          type: integer
+          format: int32
+      required:
+      - total_count
     QueryRequest:
       description: The request for the `query` operation.
       type: object
@@ -2322,7 +2792,7 @@ components:
           items:
             $ref: '#/components/schemas/ScoredVector'
         namespace:
-          description: The namespace for the vectors.
+          description: 'The namespace that served the query: the request''s namespace, or the alias''s target namespace when the request named a namespace alias.'
           type: string
         usage:
           $ref: '#/components/schemas/Usage'
@@ -2621,6 +3091,7 @@ components:
       - query
     SearchRecordsResponse:
       example:
+        namespace: example-namespace
         result:
           hits:
           - _id: example-record-1
@@ -2628,6 +3099,7 @@ components:
             fields:
               data: your example text
         usage:
+          egress_bytes: 1024
           embed_total_tokens: 10
           read_units: 5
       description: The records search response.
@@ -2645,9 +3117,14 @@ components:
           - hits
         usage:
           $ref: '#/components/schemas/SearchUsage'
+        namespace:
+          example: example-namespace
+          description: 'The namespace that served the search: the request''s namespace, or the alias''s target namespace when the request named a namespace alias.'
+          type: string
       required:
       - usage
       - result
+      - namespace
     Hit:
       example:
         _id: example-record-1
@@ -2682,6 +3159,12 @@ components:
           description: The number of read units consumed by this operation.
           type: integer
           format: int64
+        egressBytes:
+          example: 1024
+          description: The billed egress for this response, in bytes. Measured on the encoded response payload.
+          type: integer
+          format: int64
+          minimum: 0
     SearchUsage:
       type: object
       properties:
@@ -2690,6 +3173,12 @@ components:
           description: The number of read units consumed by this operation.
           type: integer
           format: int32
+          minimum: 0
+        egress_bytes:
+          example: 1024
+          description: The billed egress for this response, in bytes. Measured on the encoded response payload.
+          type: integer
+          format: int64
           minimum: 0
         embed_total_tokens:
           example: 2
@@ -2826,6 +3315,7 @@ components:
         pagination:
           next: Tm90aGluZyB0byBzZWUgaGVyZQo=
         usage:
+          egressBytes: 1024
           readUnits: 5
         vectors:
           id-1:
@@ -2854,7 +3344,7 @@ components:
             $ref: '#/components/schemas/Vector'
         namespace:
           example: example-namespace
-          description: The namespace of the vectors.
+          description: 'The namespace that served the fetch: the request''s namespace, or the alias''s target namespace when the request named a namespace alias.'
           default: ''
           type: string
         usage:
@@ -3230,6 +3720,7 @@ components:
       - top_k
     DocumentSearchUsage:
       example:
+        egress_bytes: 1024
         read_units: 5
       description: Usage information for the `search_documents` operation.
       type: object
@@ -3239,6 +3730,12 @@ components:
           description: The number of read units consumed by this operation.
           type: integer
           format: int32
+        egress_bytes:
+          example: 1024
+          description: The billed egress for this response, in bytes. Measured on the encoded response payload.
+          type: integer
+          format: int64
+          minimum: 0
       required:
       - read_units
     DocumentSearchMatch:
@@ -3271,6 +3768,7 @@ components:
           title: Introduction to Machine Learning
         namespace: my-namespace
         usage:
+          egress_bytes: 1024
           read_units: 5
       description: The response for the `search_documents` operation.
       type: object
@@ -3282,7 +3780,7 @@ components:
             $ref: '#/components/schemas/DocumentSearchMatch'
         namespace:
           example: my-namespace
-          description: The namespace that was searched.
+          description: 'The namespace that served the search: the request''s namespace, or the alias''s target namespace when the request named a namespace alias.'
           type: string
         usage:
           $ref: '#/components/schemas/DocumentSearchUsage'
@@ -3356,6 +3854,7 @@ components:
       additionalProperties: true
     DocumentFetchUsage:
       example:
+        egress_bytes: 1024
         read_units: 5
       description: Usage information for the `fetch_documents` operation.
       type: object
@@ -3365,6 +3864,12 @@ components:
           description: The number of read units consumed by this operation.
           type: integer
           format: int32
+        egress_bytes:
+          example: 1024
+          description: The billed egress for this response, in bytes. Measured on the encoded response payload.
+          type: integer
+          format: int64
+          minimum: 0
       required:
       - read_units
     FetchDocumentsResponse:
@@ -3380,7 +3885,7 @@ components:
           $ref: '#/components/schemas/Pagination'
         namespace:
           example: my-namespace
-          description: The namespace the documents were fetched from.
+          description: 'The namespace the documents were fetched from: the request''s namespace, or the alias''s target namespace when the request named a namespace alias.'
           type: string
         usage:
           $ref: '#/components/schemas/DocumentFetchUsage'
@@ -3596,6 +4101,7 @@ components:
       - _id
     DocumentListUsage:
       example:
+        egress_bytes: 1024
         read_units: 1
       description: Usage information for the `list_documents` operation.
       type: object
@@ -3605,6 +4111,12 @@ components:
           description: The number of read units consumed by this operation.
           type: integer
           format: int32
+        egress_bytes:
+          example: 1024
+          description: The billed egress for this response, in bytes. Measured on the encoded response payload.
+          type: integer
+          format: int64
+          minimum: 0
       required:
       - read_units
     ListDocumentsResponse:
@@ -3620,7 +4132,7 @@ components:
           $ref: '#/components/schemas/Pagination'
         namespace:
           example: my-namespace
-          description: The namespace the documents were listed from.
+          description: 'The namespace the documents were listed from: the request''s namespace, or the alias''s target namespace when the request named a namespace alias.'
           type: string
         usage:
           $ref: '#/components/schemas/DocumentListUsage'
@@ -3640,6 +4152,7 @@ tags:
 - name: Vector Operations
 - name: Bulk Operations
 - name: Namespace Operations
+- name: Namespace Alias Operations
 - name: Document Operations
   description: Operations on documents in an index created with a document schema — one that declares at least one full-text-searchable string field or a `dense_vector` / `sparse_vector` field under a name other than the reserved `_values` / `_sparse_values`. Metadata fields alone do not make a document schema. Indexes served by the vectors API — created from `dimension`/`metric` on an earlier API version, or from a schema holding only the reserved vector fields and metadata — and indexes served by the records API — created with an integrated embedding model, whose schema holds a single `semantic_text` field — reject every document operation with `400` and name the API to use instead. A document index accepts only the document operations; the vector data operations (upsert, query, fetch, update, delete, list) reject it, while index stats and the namespace operations remain available.
 externalDocs:

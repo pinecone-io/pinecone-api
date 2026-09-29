@@ -5,6 +5,7 @@ option java_package = "io.pinecone.proto";
 option java_multiple_files = true;
 
 import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
 import "google/api/annotations.proto";
 import "google/api/field_behavior.proto";
 
@@ -280,6 +281,10 @@ message QueryResponse {
 message Usage {
   // The number of read units consumed by this operation.
   optional uint32 read_units = 1;
+
+  // The billed egress for this response, in bytes. Measured on the encoded
+  // response payload.
+  optional uint32 egress_bytes = 2;
 }
 
 // The request for the `update` operation.
@@ -345,7 +350,7 @@ message ListNamespacesResponse {
   // Pagination token to continue past this listing
   optional Pagination pagination = 2;
   // The total number of namespaces in the index matching the prefix
-  int32 total_count = 3;
+  optional int32 total_count = 3;
 }
 
 // The request for the describe namespace operation.
@@ -365,6 +370,105 @@ message CreateNamespaceRequest {
   // Note that `filterable: false` is not currently supported.
   optional MetadataSchema schema = 2;
 }
+
+// A description of a namespace alias and the namespace it resolves to.
+message NamespaceAliasDescription {
+  // The name of the alias. Immutable after creation.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED
+  ];
+  // The namespace the alias resolves to. Changed only by repointing the alias.
+  // The default namespace is represented as `__default__`.
+  string target_namespace = 2 [
+    (google.api.field_behavior) = REQUIRED
+  ];
+  // The time the alias was created.
+  google.protobuf.Timestamp created_at = 3 [
+    (google.api.field_behavior) = REQUIRED
+  ];
+  // The time the alias was last repointed. Advances on every repoint, including
+  // a repoint to the alias's current target; equals `created_at` until the
+  // first repoint.
+  google.protobuf.Timestamp updated_at = 4 [
+    (google.api.field_behavior) = REQUIRED
+  ];
+}
+
+// The request for the create namespace alias operation.
+message CreateNamespaceAliasRequest {
+  // The name of the alias to create. Must not be the name of
+  // an existing namespace or alias in the index, cannot be `__default__`.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED
+  ];
+  // The namespace the alias resolves to. Must be an existing, active namespace
+  // in the index; an alias cannot point to another alias. To point the alias
+  // at the default namespace, use `__default__`.
+  string target_namespace = 2 [
+    (google.api.field_behavior) = REQUIRED
+  ];
+}
+
+// The request for the list namespace aliases operation.
+message ListNamespaceAliasesRequest {
+  // Pagination token to continue a previous listing operation. Filters are
+  // carried by the token; if they are repeated in the request, they must match.
+  optional string pagination_token = 1;
+  // Max number of aliases to return, between 1 and 100. Defaults to 100.
+  optional uint32 limit = 2;
+  // Return only aliases whose name starts with this prefix.
+  optional string prefix = 3;
+  // Return only aliases that resolve to this namespace. Use `__default__` for
+  // the default namespace. Aliases cannot be targets, so an alias name here
+  // matches nothing. Combines with `prefix`.
+  optional string target_namespace = 4;
+}
+
+// The response for the list namespace aliases operation.
+message ListNamespaceAliasesResponse {
+  // The aliases in this index that match the request, ordered by name.
+  repeated NamespaceAliasDescription namespace_aliases = 1;
+  // Pagination token to continue past this listing. Absent when no more
+  // aliases remain.
+  optional Pagination pagination = 2;
+  // The total number of aliases in the index matching the request filters.
+  // Always present; may change between pages under concurrent modifications.
+  optional int32 total_count = 3;
+}
+
+// The request for the describe namespace alias operation.
+message DescribeNamespaceAliasRequest {
+  // The name of the alias to describe.
+  string alias_name = 1 [
+    (google.api.field_behavior) = REQUIRED
+  ];
+}
+
+// The request for the repoint namespace alias operation.
+message RepointNamespaceAliasRequest {
+  // The name of the alias to repoint.
+  string alias_name = 1 [
+    (google.api.field_behavior) = REQUIRED
+  ];
+  // The namespace the alias resolves to after the repoint. Must be an existing,
+  // active namespace in the index; an alias cannot point to another alias. To
+  // point the alias at the default namespace, use `__default__`.
+  string target_namespace = 2 [
+    (google.api.field_behavior) = REQUIRED
+  ];
+}
+
+// The request for the delete namespace alias operation.
+message DeleteNamespaceAliasRequest {
+  // The name of the alias to delete.
+  string alias_name = 1 [
+    (google.api.field_behavior) = REQUIRED
+  ];
+}
+
+// Empty response for a successful namespace alias deletion; the target
+// namespace and its data are unchanged.
+message DeleteNamespaceAliasResponse {}
 
 message IndexedFields {
   repeated string fields = 1;
@@ -591,6 +695,88 @@ service VectorService {
     option (google.api.http) = {
         post: "/vectors/fetch_by_metadata"
         body: "*"
+    };
+  }
+}
+
+// The `NamespaceAliasService` interface manages namespace aliases within an index.
+// A namespace alias is a durable, repointable name that resolves to one concrete
+// namespace on read operations; writes must address a namespace directly.
+//
+// To read through an alias, put its name in the ordinary `namespace` field. The
+// alias resolves on `Query`, `Fetch`, `FetchByMetadata`, `List`, and the document
+// search, fetch, and list operations. Writes sent to an alias name are rejected
+// rather than resolved, as are `DescribeNamespace` and `DeleteNamespace`.
+// `DescribeIndexStats` and `ListNamespaces` report namespaces only, so an alias
+// never appears in them; describe the alias to confirm where it points.
+// `DeleteNamespace` fails while an alias points at the namespace, so repoint or
+// delete the alias first.
+//
+// Namespace aliases must be enabled for the index; every alias operation
+// returns a 501 otherwise.
+service NamespaceAliasService {
+  // Create a namespace alias
+  //
+  // Create an alias that resolves to an existing namespace in the index. A
+  // successful response means the alias resolves on every reader; the call is
+  // held open until that is true, so expect it to take about a second.
+  //
+  // For guidance and examples, see [Manage namespace aliases](https://docs.pinecone.io/guides/manage-data/namespace-aliases/manage-aliases).
+  rpc CreateNamespaceAlias(CreateNamespaceAliasRequest) returns (NamespaceAliasDescription) {
+    option (google.api.http) = {
+      post: "/namespace-aliases"
+      body: "*"
+    };
+  }
+
+  // List namespace aliases
+  //
+  // List the aliases in an index, ordered by name, optionally filtered by name
+  // prefix and by target namespace. A pagination token is returned while more
+  // aliases remain; its absence indicates that the listing is complete.
+  //
+  // For guidance and examples, see [Manage namespace aliases](https://docs.pinecone.io/guides/manage-data/namespace-aliases/manage-aliases).
+  rpc ListNamespaceAliases(ListNamespaceAliasesRequest) returns (ListNamespaceAliasesResponse) {
+    option (google.api.http) = {
+      get: "/namespace-aliases"
+    };
+  }
+
+  // Describe a namespace alias
+  //
+  // Get an alias and the namespace it resolves to.
+  //
+  // For guidance and examples, see [Manage namespace aliases](https://docs.pinecone.io/guides/manage-data/namespace-aliases/manage-aliases).
+  rpc DescribeNamespaceAlias(DescribeNamespaceAliasRequest) returns (NamespaceAliasDescription) {
+    option (google.api.http) = {
+      get: "/namespace-aliases/{alias_name}"
+    };
+  }
+
+  // Repoint a namespace alias
+  //
+  // Update the namespace an alias resolves to. The change is atomic, and a
+  // successful response means the new target is live for every reader; the call
+  // is held open until that is true, so expect it to take about a second.
+  //
+  // For guidance and examples, see [Manage namespace aliases](https://docs.pinecone.io/guides/manage-data/namespace-aliases/manage-aliases).
+  rpc RepointNamespaceAlias(RepointNamespaceAliasRequest) returns (NamespaceAliasDescription) {
+    option (google.api.http) = {
+      patch: "/namespace-aliases/{alias_name}"
+      body: "*"
+    };
+  }
+
+  // Delete a namespace alias
+  //
+  // Remove an alias from the index. The target namespace and its data are
+  // unchanged. Reads that still use the alias name are served as reads of a
+  // nonexistent namespace (empty results, not an error).
+  //
+  // For guidance and examples, see [Manage namespace aliases](https://docs.pinecone.io/guides/manage-data/namespace-aliases/manage-aliases).
+  rpc DeleteNamespaceAlias(DeleteNamespaceAliasRequest) returns (DeleteNamespaceAliasResponse) {
+    option (google.api.http) = {
+      delete: "/namespace-aliases/{alias_name}"
     };
   }
 }
